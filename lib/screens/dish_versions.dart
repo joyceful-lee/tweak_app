@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/dish.dart';
 import '../services/dish_service.dart';
 import 'edit_dish_version.dart';
+import 'dish_notes.dart';
 
 /// ------------------------------
 /// Screen that lists the various versions of a dish
@@ -300,6 +301,23 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
       appBar: AppBar(
         title: Text(widget.dish.name),
         backgroundColor: cs.onSurface,
+        actions: [
+          IconButton(
+            tooltip: "View all notes",
+            icon: const Icon(Icons.sticky_note_2),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DishAllNotesScreen(
+                    dish: widget.dish,
+                    dishService: widget.dishService,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

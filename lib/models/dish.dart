@@ -104,7 +104,7 @@ class DishVersion {
       'notes': notes,
       'tags': tags,
       'status': status,
-      'created_at': createdAt,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 }

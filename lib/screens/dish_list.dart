@@ -7,6 +7,7 @@ import '../models/dish.dart';
 import '../services/dish_service.dart';
 import 'add_dish_screen.dart';
 import 'dish_versions.dart';
+import 'dish_notes.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -215,22 +216,56 @@ class _DishListScreenState extends State<DishListScreen> {
                   // If something is selected, tapping toggles selection instead of navigating.
                   if (_selectedDishId != null) {
                     setState(() {
-                      _selectedDishId =
-                      isSelected ? null : dish.id;
+                      _selectedDishId = isSelected ? null : dish.id;
                     });
                     return;
                   }
 
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DishVersionsScreen(
-                        dish: dish,
-                        dishService: _dishService,
+                  final action = await showModalBottomSheet<String>(
+                    context: context,
+                    builder: (_) => SafeArea(
+                      child: Wrap(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.layers),
+                            title: const Text("View Versions"),
+                            onTap: () => Navigator.pop(context, "versions"),
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.sticky_note_2),
+                            title: const Text("View Notes (all versions)"),
+                            onTap: () => Navigator.pop(context, "notes"),
+                          ),
+                        ],
                       ),
                     ),
                   );
-                  _loadDishes();
+
+                  if (!mounted || action == null) return;
+                  if (action == "versions") {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DishVersionsScreen(
+                          dish: dish,
+                          dishService: _dishService,
+                        ),
+                      ),
+                    );
+                    _loadDishes();
+                    return;
+                  }
+
+                  if (action == "notes") {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DishAllNotesScreen(dish: dish, dishService: _dishService),
+                      ),
+                    );
+                    _loadDishes();
+                    return;
+                  }
                 },
                 onLongPress: () {
                   setState(() {
