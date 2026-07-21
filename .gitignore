@@ -30,6 +30,8 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
+.agents
+.artifacts
 /build/
 /coverage/
 lib/config/supabase_config.dart

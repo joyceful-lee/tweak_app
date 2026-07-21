@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_theme.dart';
 import '../services/dish_service.dart';
 
 /// ------------------------------
@@ -94,11 +95,12 @@ class _AddDishScreenState extends State<AddDishScreen> {
       debugPrint('ERROR: $e');
       debugPrint('STACKTRACE:\n$stackTrace');
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -106,7 +108,7 @@ class _AddDishScreenState extends State<AddDishScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontFamily: 'Noot')),
+        Text(title, style: const TextStyle(fontFamily: kHeadingFont, fontSize: 16)),
         const SizedBox(height: 8),
         ...controllers.asMap().entries.map((entry) {
           final index = entry.key;
@@ -123,7 +125,12 @@ class _AddDishScreenState extends State<AddDishScreen> {
               if (controllers.length > 1)
                 IconButton(
                   icon: const Icon(Icons.remove_circle),
-                  onPressed: () => setState(() => controllers.removeAt(index)),
+                  onPressed: () {
+                    setState(() {
+                      final controller = controllers.removeAt(index);
+                      controller.dispose();
+                    });
+                  },
                 ),
             ],
           );

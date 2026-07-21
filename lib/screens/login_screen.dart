@@ -1,7 +1,7 @@
 import 'dart:ui'; // for ImageFilter.blur
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth.dart';
-import 'dish_list.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,8 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _forgotPassword() async {
     final email = emailController.text.trim();
 
-    if (email.isEmpty) {
-      setState(() => error = "Enter your email first.");
+    if (!_isValidEmail(email)) {
+      setState(() => error = 'Enter a valid email address first.');
       return;
     }
 
@@ -42,22 +42,37 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await sendPasswordResetEmail(email); // found in auth.dart
+      await sendPasswordResetEmail(email);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Password reset email sent to $email")),
       );
-    } catch (e) {
+    } on AuthException catch (e) {
       if (!mounted) return;
-      setState(() => error = e.toString());
+      setState(() => error = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => error = 'Unable to send the reset email. Please try again.');
     } finally {
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
-
   Future<void> handleAuth() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
+    if (!_isValidEmail(email)) {
+      setState(() => error = 'Enter a valid email address.');
+      return;
+    }
+
+    if (password.isEmpty) {
+      setState(() => error = 'Enter your password.');
+      return;
+    }
+
     setState(() {
       loading = true;
       error = null;
@@ -66,28 +81,65 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (isLogin) {
         await signIn(
-          emailController.text.trim(),
-          passwordController.text.trim(),
-        );
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DishListScreen()),
+          email,
+          password,
         );
       } else {
-        await signUp(emailController.text.trim(), passwordController.text.trim());
+        await signUp(
+          email,
+          password,
+        );
+
         if (!mounted) return;
-        setState(() => isLogin = true);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Account created! Check your email if verification is enabled.",
+            ),
+          ),
+        );
       }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        error = e.message;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => error = e.toString());
-    }
 
-    if (!mounted) return;
-    setState(() => loading = false);
+      setState(() {
+        error = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _continueWithGoogle() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+
+    try {
+      await signInWithGoogle();
+    } catch (_) {
+      if (mounted) {
+        setState(() => error = 'Google sign-in could not be started. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
   }
 
   @override
@@ -130,6 +182,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
+                          textInputAction: TextInputAction.next,
                           decoration: InputDecoration(
                             labelText: "Email",
                             border: OutlineInputBorder(
@@ -142,6 +196,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: passwordController,
                           obscureText: true,
+                          autofillHints: isLogin
+                              ? const [AutofillHints.password]
+                              : const [AutofillHints.newPassword],
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) {
+                            if (!loading) handleAuth();
+                          },
                           decoration: InputDecoration(
                             labelText: "Password",
                             border: OutlineInputBorder(
@@ -188,13 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 12),
 
                         ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              await signInWithGoogle();
-                            } catch (e) {
-                              setState(() => error = e.toString());
-                            }
-                          },
+                          onPressed: loading ? null : _continueWithGoogle,
                           icon: Image.asset('assets/icons/google-icon.png', height: 20),
                           label: const Text("Continue with Google"),
                           style: ElevatedButton.styleFrom(

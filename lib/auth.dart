@@ -1,8 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'config/supabase_config.dart';
 
 final supabase = Supabase.instance.client;
-final GoogleSignIn googleSignIn = GoogleSignIn.instance;
 
 /// ------------------------------
 /// Sign up with email
@@ -14,40 +13,45 @@ Future<void> signUp(String email, String password) async {
 /// ------------------------------
 /// Login with email
 /// ------------------------------
-Future<String?> signIn(String email, String password) async {
-  try {
-    final res = await supabase.auth.signInWithPassword(email: email, password: password);
-    final user = res.user;
-    if (user == null) return "No user found";
+Future<void> signIn(String email, String password) async {
+  final res = await supabase.auth.signInWithPassword(
+    email: email,
+    password: password,
+  );
 
-    // Fetch profile to get role
-    final profile = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('auth_id', user.id)
-        .single();
+  final user = res.user;
 
-    return profile['role'];
-  } catch (e) {
-    return e.toString();
+  if (user == null) {
+    throw Exception('No authenticated user returned.');
   }
 }
 
 /// ------------------------------
-/// TODO: redirect for password reset
+/// Send Password Reset Email
 /// ------------------------------
 Future<void> sendPasswordResetEmail(String email) async {
-
+  await supabase.auth.resetPasswordForEmail(
+    email,
+    redirectTo: SupabaseConfig.redirectUrl,
+  );
 }
 
 /// ------------------------------
-/// Google Login TODO
+/// Google Login
 /// ------------------------------
 Future<void> signInWithGoogle() async {
   try {
-    await GoogleSignIn.instance.authenticate();
+    await supabase.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: SupabaseConfig.redirectUrl,
+      scopes: 'openid email profile',
+    );
+  } on AuthException catch (e) {
+    throw Exception('Google sign-in failed: ${e.message}');
   } catch (e) {
-    throw Exception("Google sign-in failed: $e");
+    throw Exception(
+      'Google sign-in failed. Check that Google is enabled in Supabase Auth and that the redirect URL is configured: ${SupabaseConfig.redirectUrl}',
+    );
   }
 }
 
@@ -57,4 +61,3 @@ Future<void> signInWithGoogle() async {
 Future<void> signOut() async {
   await supabase.auth.signOut();
 }
-

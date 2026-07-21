@@ -51,7 +51,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  flutter_launcher_icons: "^0.13.1"
+  flutter_launcher_icons: ^0.13.1
+  supabase_flutter: ^2.5.0
+  flutter_dotenv: ^5.1.0
 
 flutter_launcher_icons:
   android: true
@@ -105,3 +107,16 @@ flutter:
     - family: Noot
       fonts:
         - asset: assets/fonts/noot-regular.ttf
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-VariableFont_wght.ttf
+        - asset: assets/fonts/Nunito-Italic-VariableFont_wght.ttf
+    - family: Chewy
+      fonts:
+        - asset: assets/fonts/Chewy-Regular.ttf
+    - family: Matemasie
+      fonts:
+        - asset: assets/fonts/Matemasie-Regular.ttf
+    - family: Baloo
+      fonts:
+        - asset: assets/fonts/Baloo2-VariableFont_wght.ttf

@@ -91,7 +91,8 @@ class _EditDishVersionState extends State<EditDishVersion> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.dish.name} • v${widget.version.versionNumber}'),
+        title: Text('${widget.dish.name} • v${widget.version.versionNumber}',
+          style: TextStyle(fontSize: 14),),
         actions: [
           if (widget.mode == DishVersionMode.viewOnly) ...[
             IconButton(

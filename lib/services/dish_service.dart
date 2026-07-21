@@ -44,7 +44,7 @@ class DishService {
     final response = await supabase
         .from('dishes')
         .select('''
-          id, name, description, status, best_version,
+          id, name, description, status, best_version, created_at,
           best:dish_versions!dishes_best_version_fkey (
             id, dish_id, version_number, tags, directions
           )

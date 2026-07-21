@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_theme.dart';
 import '../models/dish.dart';
 import '../services/dish_service.dart';
 import 'edit_dish_version.dart';
@@ -194,24 +195,24 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+                ?.copyWith(fontFamily: kHeadingFont,fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(
                 value: 'finalized',
-                label: Text('Finalized'),
+                label: Text('Finalized', style: TextStyle(fontFamily: kBodyFont)),
                 icon: Icon(Icons.check_circle)
               ),
               ButtonSegment(
                 value: 'in_testing',
-                label: Text('In Testing'),
+                label: Text('In Testing', style: TextStyle(fontFamily: kBodyFont)),
                 icon: Icon(Icons.science),
               ),
               ButtonSegment(
                 value: 'abandoned',
-                label: Text('Abandoned'),
+                label: Text('Abandoned', style: TextStyle(fontFamily: kBodyFont)),
                 icon: Icon(Icons.cancel),
               ),
             ],
@@ -299,7 +300,9 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.dish.name),
+        title: Text(widget.dish.name,
+          style: TextStyle(fontSize: 14),
+        ),
         backgroundColor: cs.onSurface,
         actions: [
           IconButton(
@@ -346,6 +349,7 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
                           Text(
                             "Version ${v.versionNumber}",
                             style: TextStyle(
+                              fontFamily: kHeadingFont,
                               color: isBest
                                   ? cs.onSurface
                                   : cs.onSurface,
@@ -364,6 +368,9 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
                         children: [
                           Text(
                             "Date: ${v.createdAt.toIso8601String().split('T').first}",
+                            style: TextStyle(
+                              fontFamily: kBodyFont
+                            )
                           ),
                         ],
                       ),

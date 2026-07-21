@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tweak_app/app_theme.dart';
 
 // screen routes
 import 'config/supabase_config.dart';
-import 'screens/login_screen.dart';
 import 'screens/dish_list.dart';
+import 'screens/login_screen.dart';
+import 'screens/reset_password_screen.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,22 +18,71 @@ Future<void> main() async {
   await Supabase.initialize(
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.implicit,
+    ),
   );
 
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final StreamSubscription<AuthState> _authSubscription;
+  bool _isShowingRecovery = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        _showPasswordRecovery();
+      }
+    });
+  }
+
+  void _showPasswordRecovery() {
+    if (_isShowingRecovery) return;
+
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showPasswordRecovery();
+      });
+      return;
+    }
+
+    _isShowingRecovery = true;
+    navigator
+        .push(
+          MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+        )
+        .whenComplete(() => _isShowingRecovery = false);
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Tweak',
       theme: ThemeData(
         colorScheme: earthyLightScheme,
         useMaterial3: true,
+        fontFamily: 'Nunito',
         appBarTheme: AppBarTheme(
           titleTextStyle: TextStyle(
             fontFamily: 'Noot',
@@ -115,24 +169,17 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final supabase = Supabase.instance.client;
-
+    final auth = Supabase.instance.client.auth;
     return StreamBuilder<AuthState>(
-      stream: supabase.auth.onAuthStateChange,
+      stream: auth.onAuthStateChange,
       builder: (context, snapshot) {
-        final session = snapshot.data?.session;
-
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        if (session == null) {
-          return const LoginScreen();
-        }
-
-        return const DishListScreen();
+        return auth.currentSession == null
+            ? const LoginScreen()
+            : const DishListScreen();
       },
     );
   }

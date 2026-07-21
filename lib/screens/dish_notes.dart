@@ -21,7 +21,7 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
   List<DishVersion> _versions = []; // keep ALL for correct baselines
 
   bool _showChanges = true;
-  bool _highlightDiff = true;
+  final bool _highlightDiff = true;
   bool _showDeletions = true;
 
   @override
@@ -224,7 +224,9 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("${widget.dish.name} • Notes"),
+        title: Text("${widget.dish.name} • Notes",
+          style: TextStyle(fontSize: 14),
+        ),
         backgroundColor: cs.onSurface,
       ),
       body: _isLoading

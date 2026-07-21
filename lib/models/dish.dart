@@ -9,6 +9,7 @@ class Dish {
   final String? bestVersionId;
   final DishVersion? bestVersion;
   final List<DishVersion>? versions;
+  final DateTime createdAt;
 
   Dish({
     required this.id,
@@ -16,6 +17,7 @@ class Dish {
     required this.description,
     required this.status,
     required this.bestVersion,
+    required this.createdAt,
     this.bestVersionId,
     this.versions = const [],
   });
@@ -32,6 +34,9 @@ class Dish {
           ? DishVersion.fromMap(Map<String, dynamic>.from(map['best']))
           : null,
       versions: const [],
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'])
+          : DateTime.now(),
     );
   }
 }
