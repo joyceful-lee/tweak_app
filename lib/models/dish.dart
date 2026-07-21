@@ -33,11 +33,27 @@ class Dish {
       bestVersion: map['best'] != null
           ? DishVersion.fromMap(Map<String, dynamic>.from(map['best']))
           : null,
-      versions: const [],
+      versions: map['dish_versions'] != null
+          ? (map['dish_versions'] as List)
+          .map((v) => DishVersion.fromMap(Map<String, dynamic>.from(v)))
+          .toList()
+          : const [],
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
           : DateTime.now(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'status': status,
+      'best_version_id': bestVersionId,
+      'created_at': createdAt.toIso8601String(),
+      'versions': versions?.map((v) => v.toJson()).toList(),
+    };
   }
 }
 

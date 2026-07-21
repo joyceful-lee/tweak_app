@@ -491,35 +491,6 @@ class _DishListScreenState extends State<DishListScreen> {
       appBar: AppBar(
         title: Text("Tweak", style: TextStyle(fontFamily: kTitleFont)),
         backgroundColor: cs.inverseSurface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: "Logout",
-            onPressed: () async {
-              final shouldLogout = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text("Logout"),
-                  content: const Text("Are you sure you want to log out?"),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text("Cancel"),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text("Logout"),
-                    ),
-                  ],
-                ),
-              );
-
-              if (shouldLogout == true) {
-                await Supabase.instance.client.auth.signOut();
-              }
-            },
-          ),
-        ],
       ),
       bottomNavigationBar: hasSelection
           ? SafeArea(
@@ -624,7 +595,7 @@ class _DishListScreenState extends State<DishListScreen> {
                           ),
                         );
 
-                        if (!mounted || action == null) return;
+                        if (!context.mounted || action == null) return;
                         if (action == "versions") {
                           await Navigator.push(
                             context,

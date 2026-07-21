@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -6,6 +7,8 @@ import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/dish.dart';
+import '../services/dish_service.dart';
+import '../services/note_service.dart';
 
 class ExportService {
   /// ------------------------------
@@ -189,6 +192,35 @@ class ExportService {
     await Printing.sharePdf(
       bytes: bytes,
       filename: fileName,
+    );
+  }
+
+  /// ------------------------------
+  /// Bulk Export All Data (JSON)
+  /// ------------------------------
+  static Future<void> exportAllData({
+    required DishService dishService,
+    required NoteService noteService,
+  }) async {
+    final dishes = await dishService.fetchAllDishesFull();
+    final notes = await noteService.fetchNotes();
+
+    final exportData = {
+      'exported_at': DateTime.now().toIso8601String(),
+      'recipes': dishes.map((d) => d.toJson()).toList(),
+      'notes': notes.map((n) => n.toJson()).toList(),
+    };
+
+    final jsonString = const JsonEncoder.withIndent('  ').convert(exportData);
+    final dir = await getTemporaryDirectory();
+    final fileName = 'tweak_export_${DateTime.now().millisecondsSinceEpoch}.json';
+    final file = File('${dir.path}/$fileName');
+
+    await file.writeAsString(jsonString);
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: 'My Tweak Data Export',
     );
   }
 }

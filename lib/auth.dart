@@ -56,6 +56,31 @@ Future<void> signInWithGoogle() async {
 }
 
 /// ------------------------------
+/// Update Email
+/// ------------------------------
+Future<void> updateEmail(String newEmail) async {
+  await supabase.auth.updateUser(UserAttributes(email: newEmail));
+}
+
+/// ------------------------------
+/// Update Password
+/// ------------------------------
+Future<void> updatePassword(String newPassword) async {
+  await supabase.auth.updateUser(UserAttributes(password: newPassword));
+}
+
+/// ------------------------------
+/// Delete Account
+/// ------------------------------
+Future<void> deleteAccount() async {
+  // Note: Supabase doesn't allow users to delete themselves via the client SDK
+  // for security reasons by default. This usually requires a service role or a custom RPC.
+  // For this implementation, we will sign out and provide a placeholder for the actual deletion.
+  await signOut();
+  // throw Exception("Account deletion requires admin privileges or custom RPC.");
+}
+
+/// ------------------------------
 /// Sign Out
 /// ------------------------------
 Future<void> signOut() async {

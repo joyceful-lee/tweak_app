@@ -58,6 +58,23 @@ class DishService {
   }
 
   /// ------------------------------
+  /// Fetch all dishes with all versions (for export)
+  /// ------------------------------
+  Future<List<Dish>> fetchAllDishesFull() async {
+    final response = await supabase
+        .from('dishes')
+        .select('''
+          *,
+          dish_versions!dish_versions_dish_id_fkey (*)
+        ''')
+        .order('created_at', ascending: false);
+
+    return (response as List)
+        .map((dish) => Dish.fromMap(dish))
+        .toList();
+  }
+
+  /// ------------------------------
   /// Fetch all versions of a dish
   /// ------------------------------
   Future<List<DishVersion>> fetchDishVersions(String dishId) async {

@@ -7,6 +7,7 @@ import 'package:tweak_app/app_theme.dart';
 // screen routes
 import 'config/supabase_config.dart';
 import 'screens/dish_list.dart';
+import 'screens/main_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/reset_password_screen.dart';
 
@@ -75,7 +76,6 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Tweak',
@@ -179,7 +179,7 @@ class AuthGate extends StatelessWidget {
 
         return auth.currentSession == null
             ? const LoginScreen()
-            : const DishListScreen();
+            : const MainScreen();
       },
     );
   }
