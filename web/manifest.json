@@ -1,12 +1,12 @@
 {
-    "name": "tweak_app",
-    "short_name": "tweak_app",
+    "name": "Tweak Recipe Notebook",
+    "short_name": "Tweak",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "description": "Your recipes and photos, on your phone and computer.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

@@ -1,0 +1,11 @@
+*
+!vercel.json
+!build
+!build/web
+!build/web/**
+!api
+!api/**
+!server
+!server/**
+!package.json
+!package-lock.json

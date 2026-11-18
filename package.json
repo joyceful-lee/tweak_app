@@ -1,0 +1,25 @@
+{
+  "name": "tweak-migration-tools",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/migration/*.test.mjs",
+    "db:check": "node --env-file=.env.local scripts/neon/check.mjs",
+    "db:migrate": "node --env-file=.env.local scripts/neon/migrate.mjs",
+    "db:verify": "node --env-file=.env.local scripts/neon/verify-schema.mjs",
+    "db:audit": "node --env-file=.env.local scripts/neon/audit-snapshot.mjs",
+    "db:export:supabase": "node --env-file=.env.local --env-file=.env.migration.local scripts/neon/export-supabase.mjs",
+    "db:import:supabase": "node --env-file=.env.local scripts/neon/import-supabase.mjs",
+    "dev": "node --env-file=.env.local server/dev.mjs",
+    "db:verify-api": "node --env-file=.env.local scripts/neon/verify-api.mjs"
+  },
+  "dependencies": {
+    "@neon/auth": "0.8.2",
+    "@vercel/blob": "2.4.0",
+    "@vercel/functions": "^3.11.3",
+    "pg": "^8.16.3"
+  }
+}

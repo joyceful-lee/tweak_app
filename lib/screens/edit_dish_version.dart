@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:typed_data';
+import '../auth.dart';
 import '../models/dish.dart';
 import '../services/dish_service.dart';
 import '../services/export_service.dart';
+import '../services/recipe_photo_service.dart';
+import '../widgets/recipe_photos.dart';
 
 /// ------------------------------
 /// Screen to edit, increment, and view recipes
 /// ------------------------------
-enum DishVersionMode {
-  createNewVersion,
-  editExisting,
-  viewOnly,
-}
+enum DishVersionMode { createNewVersion, editExisting, viewOnly }
 
 class EditDishVersion extends StatefulWidget {
   final Dish dish;
@@ -37,7 +36,10 @@ class _EditDishVersionState extends State<EditDishVersion> {
   late List<String> _tags;
   late TextEditingController _notesController;
   late TextEditingController _tagController;
-
+  late List<String> _photoPaths;
+  final List<Uint8List> _photos = [];
+  late final _photoService = RecipePhotoService(backend);
+  bool _isSaving = false;
 
   bool get _readOnly => widget.mode == DishVersionMode.viewOnly;
 
@@ -49,10 +51,11 @@ class _EditDishVersionState extends State<EditDishVersion> {
     _tags = List.from(widget.version.tags);
     _notesController = TextEditingController(text: widget.version.notes);
     _tagController = TextEditingController();
+    _photoPaths = List.of(widget.version.photoPaths);
   }
 
   @override
-  void dispose(){
+  void dispose() {
     _notesController.dispose();
     _tagController.dispose();
 
@@ -60,39 +63,71 @@ class _EditDishVersionState extends State<EditDishVersion> {
   }
 
   void _save() async {
-    final dishService = DishService(Supabase.instance.client);
-
-    if (widget.mode == DishVersionMode.createNewVersion) {
-      await dishService.addDishVersion(
-        widget.dish.id,
-        baseVersionId: widget.version.id,
-        ingredients: _ingredients,
-        directions: _directions,
-        notes: _notesController.text,
-        tags: _tags,
+    if (_isSaving || _readOnly) return;
+    if (_ingredients.every((s) => s.trim().isEmpty) ||
+        _directions.every((s) => s.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ingredients and directions cannot be empty.'),
+        ),
       );
-    } else if (widget.mode == DishVersionMode.editExisting) {
-      await dishService.updateDishVersion(
-        versionId: widget.version.id,
-        ingredients: _ingredients,
-        directions: _directions,
-        notes: _notesController.text,
-        tags: _tags,
-      );
+      return;
     }
+    setState(() => _isSaving = true);
+    final dishService = DishService(backend);
+    final uploaded = <String>[];
+    try {
+      for (final bytes in _photos) {
+        uploaded.add(await _photoService.upload(bytes));
+      }
+      if (widget.mode == DishVersionMode.createNewVersion) {
+        await dishService.addDishVersion(
+          widget.dish.id,
+          baseVersionId: widget.version.id,
+          ingredients: _ingredients,
+          directions: _directions,
+          notes: _notesController.text,
+          tags: _tags,
+          photoPaths: [..._photoPaths, ...uploaded],
+        );
+      } else if (widget.mode == DishVersionMode.editExisting) {
+        await dishService.updateDishVersion(
+          versionId: widget.version.id,
+          ingredients: _ingredients,
+          directions: _directions,
+          notes: _notesController.text,
+          tags: _tags,
+          photoPaths: [..._photoPaths, ...uploaded],
+        );
+      }
 
-    if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      try {
+        await _photoService.discardUploads(uploaded);
+      } catch (cleanupError) {
+        debugPrint('Could not clean up unsaved photos: $cleanupError');
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not save recipe: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final dateStr =
-        widget.version.createdAt.toIso8601String().split('T').first;
+    final dateStr = widget.version.createdAt.toIso8601String().split('T').first;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.dish.name} • v${widget.version.versionNumber}',
-          style: TextStyle(fontSize: 14),),
+        title: Text(
+          '${widget.dish.name} • v${widget.version.versionNumber}',
+          style: TextStyle(fontSize: 14),
+        ),
         actions: [
           if (widget.mode == DishVersionMode.viewOnly) ...[
             IconButton(
@@ -116,83 +151,96 @@ class _EditDishVersionState extends State<EditDishVersion> {
           ],
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sectionHeader(
-            context,
-            title: 'Dish Info',
-            trailing: widget.isBest
-                ? const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.star, color: Colors.orange),
-                SizedBox(width: 6),
-                Text('Best'),
-              ],
-            )
-                : null,
-          ),
-          _readOnlyBox('Name', widget.dish.name),
-          _readOnlyBox('Description', widget.dish.description),
-          _readOnlyBox('Status', widget.version.status),
-          _readOnlyBox('Created', dateStr),
-
-          const SizedBox(height: 18),
-          _sectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionHeader(context, title: "Ingredients"),
-                _buildReorderableList(_ingredients),
-              ],
+      body: AbsorbPointer(
+        absorbing: _isSaving,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _sectionHeader(
+              context,
+              title: 'Dish Info',
+              trailing: widget.isBest
+                  ? const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star, color: Colors.orange),
+                        SizedBox(width: 6),
+                        Text('Best'),
+                      ],
+                    )
+                  : null,
             ),
-          ),
+            _readOnlyBox('Name', widget.dish.name),
+            _readOnlyBox('Description', widget.dish.description),
+            _readOnlyBox('Status', widget.version.status),
+            _readOnlyBox('Created', dateStr),
 
-
-          const SizedBox(height: 18),
-          _sectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionHeader(context, title: "Directions"),
-                _buildReorderableList(_directions, numbered: true),
-              ],
+            const SizedBox(height: 18),
+            RecipePhotos(
+              service: _photoService,
+              paths: _photoPaths,
+              pending: _photos,
+              readOnly: _readOnly,
+              onChanged: () {},
             ),
-          ),
 
-          const SizedBox(height: 18),
-          _sectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionHeader(context, title: "Tags"),
-                _buildTags(),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 18),
-          _sectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionHeader(context, title: "Notes"),
-                _buildNotes(),
-              ],
-            ),
-          ),
-          const SizedBox(height: 30),
-          if (!_readOnly)
-            ElevatedButton(
-              onPressed: _save,
-              child: Text(
-                widget.mode == DishVersionMode.createNewVersion
-                    ? "Create New Version"
-                    : "Save Changes",
+            const SizedBox(height: 18),
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionHeader(context, title: "Ingredients"),
+                  _buildReorderableList(_ingredients),
+                ],
               ),
             ),
-        ],
+
+            const SizedBox(height: 18),
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionHeader(context, title: "Directions"),
+                  _buildReorderableList(_directions, numbered: true),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 18),
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionHeader(context, title: "Tags"),
+                  _buildTags(),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 18),
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionHeader(context, title: "Notes"),
+                  _buildNotes(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+            if (!_readOnly)
+              ElevatedButton(
+                onPressed: _isSaving ? null : _save,
+                child: Text(
+                  _isSaving
+                      ? 'Saving…'
+                      : widget.mode == DishVersionMode.createNewVersion
+                      ? "Create New Version"
+                      : "Save Changes",
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -200,18 +248,20 @@ class _EditDishVersionState extends State<EditDishVersion> {
   /// ------------------------------
   /// UI components to make it less ugly (not quite pretty yet)
   /// ------------------------------
-  Widget _sectionHeader(BuildContext context,
-      {required String title, Widget? trailing}) {
+  Widget _sectionHeader(
+    BuildContext context, {
+    required String title,
+    Widget? trailing,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
           Text(
             title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const Spacer(),
           ?trailing,
@@ -229,7 +279,7 @@ class _EditDishVersionState extends State<EditDishVersion> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -239,16 +289,13 @@ class _EditDishVersionState extends State<EditDishVersion> {
     );
   }
 
-
   Widget _readOnlyBox(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style:
-              const TextStyle(fontWeight: FontWeight.w600)),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Container(
             width: double.infinity,
@@ -264,10 +311,7 @@ class _EditDishVersionState extends State<EditDishVersion> {
     );
   }
 
-  Widget _buildReorderableList(
-      List<String> items, {
-        bool numbered = false,
-      }) {
+  Widget _buildReorderableList(List<String> items, {bool numbered = false}) {
     if (_readOnly && items.isEmpty) {
       return _emptyHint("None");
     }
@@ -282,12 +326,12 @@ class _EditDishVersionState extends State<EditDishVersion> {
           onReorder: _readOnly
               ? (_, _) {}
               : (oldIndex, newIndex) {
-            setState(() {
-              if (newIndex > oldIndex) newIndex--;
-              final item = items.removeAt(oldIndex);
-              items.insert(newIndex, item);
-            });
-          },
+                  setState(() {
+                    if (newIndex > oldIndex) newIndex--;
+                    final item = items.removeAt(oldIndex);
+                    items.insert(newIndex, item);
+                  });
+                },
           proxyDecorator: (child, index, animation) {
             return Material(
               color: Colors.transparent,
@@ -297,10 +341,12 @@ class _EditDishVersionState extends State<EditDishVersion> {
                   return Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(12), // 🔥 your curved edges
+                      borderRadius: BorderRadius.circular(
+                        12,
+                      ), // 🔥 your curved edges
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha:0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -330,25 +376,21 @@ class _EditDishVersionState extends State<EditDishVersion> {
                     ),
                   if (numbered)
                     Padding(
-                      padding:
-                      const EdgeInsets.only(top: 14, right: 6),
+                      padding: const EdgeInsets.only(top: 14, right: 6),
                       child: Text("${index + 1}."),
                     ),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius:
-                        BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: TextFormField(
                         initialValue: items[index],
                         readOnly: _readOnly,
                         maxLines: null,
-                        decoration:
-                        const InputDecoration(
+                        decoration: const InputDecoration(
                           border: InputBorder.none,
                         ),
                         onChanged: (val) {
@@ -385,7 +427,6 @@ class _EditDishVersionState extends State<EditDishVersion> {
     );
   }
 
-
   Widget _buildTags() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,10 +440,10 @@ class _EditDishVersionState extends State<EditDishVersion> {
               onDeleted: _readOnly
                   ? null
                   : () {
-                setState(() {
-                  _tags.remove(tag);
-                });
-              },
+                      setState(() {
+                        _tags.remove(tag);
+                      });
+                    },
             );
           }).toList(),
         ),
@@ -424,11 +465,10 @@ class _EditDishVersionState extends State<EditDishVersion> {
               });
             },
           ),
-        ]
+        ],
       ],
     );
   }
-
 
   Widget _buildNotes() {
     return Container(
@@ -441,8 +481,7 @@ class _EditDishVersionState extends State<EditDishVersion> {
         controller: _notesController,
         readOnly: _readOnly,
         maxLines: null,
-        decoration:
-        const InputDecoration(border: InputBorder.none),
+        decoration: const InputDecoration(border: InputBorder.none),
       ),
     );
   }
@@ -453,8 +492,9 @@ class _EditDishVersionState extends State<EditDishVersion> {
       child: Text(
         text,
         style: TextStyle(
-            color: Colors.grey.shade600,
-            fontStyle: FontStyle.italic),
+          color: Colors.grey.shade600,
+          fontStyle: FontStyle.italic,
+        ),
       ),
     );
   }

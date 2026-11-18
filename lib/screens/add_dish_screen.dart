@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import '../app_theme.dart';
 import '../services/dish_service.dart';
+import '../services/recipe_photo_service.dart';
+import '../widgets/recipe_photos.dart';
 
 /// ------------------------------
 /// Add a new dish to the dish list
@@ -24,10 +27,17 @@ class _AddDishScreenState extends State<AddDishScreen> {
 
   String status = "in_testing";
 
-  final List<TextEditingController> ingredientControllers = [TextEditingController()];
-  final List<TextEditingController> directionControllers = [TextEditingController()];
+  final List<TextEditingController> ingredientControllers = [
+    TextEditingController(),
+  ];
+  final List<TextEditingController> directionControllers = [
+    TextEditingController(),
+  ];
 
   bool _isSaving = false;
+  final List<Uint8List> _photos = [];
+  final List<String> _photoPaths = [];
+  late final _photoService = RecipePhotoService(widget.dishService.client);
 
   @override
   void dispose() {
@@ -75,7 +85,11 @@ class _AddDishScreenState extends State<AddDishScreen> {
 
     setState(() => _isSaving = true);
 
+    final uploaded = <String>[];
     try {
+      for (final bytes in _photos) {
+        uploaded.add(await _photoService.upload(bytes));
+      }
       await widget.dishService.createDish(
         name: name,
         description: description,
@@ -84,6 +98,7 @@ class _AddDishScreenState extends State<AddDishScreen> {
         directions: directions,
         notes: notes,
         tags: tags,
+        photoPaths: uploaded,
       );
 
       if (!mounted) return;
@@ -92,23 +107,34 @@ class _AddDishScreenState extends State<AddDishScreen> {
       );
       Navigator.pop(context); // Return to dish list
     } catch (e, stackTrace) {
+      try {
+        await _photoService.discardUploads(uploaded);
+      } catch (cleanupError) {
+        debugPrint('Could not clean up unsaved photos: $cleanupError');
+      }
       debugPrint('ERROR: $e');
       debugPrint('STACKTRACE:\n$stackTrace');
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  Widget _buildDynamicList(String title, List<TextEditingController> controllers) {
+  Widget _buildDynamicList(
+    String title,
+    List<TextEditingController> controllers,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontFamily: kHeadingFont, fontSize: 16)),
+        Text(
+          title,
+          style: const TextStyle(fontFamily: kHeadingFont, fontSize: 16),
+        ),
         const SizedBox(height: 8),
         ...controllers.asMap().entries.map((entry) {
           final index = entry.key;
@@ -118,7 +144,9 @@ class _AddDishScreenState extends State<AddDishScreen> {
               Expanded(
                 child: TextFormField(
                   controller: controller,
-                  validator: (value) => (value == null || value.trim().isEmpty) ? 'Cannot be empty' : null,
+                  validator: (value) => (value == null || value.trim().isEmpty)
+                      ? 'Cannot be empty'
+                      : null,
                   decoration: InputDecoration(labelText: "$title ${index + 1}"),
                 ),
               ),
@@ -136,7 +164,8 @@ class _AddDishScreenState extends State<AddDishScreen> {
           );
         }),
         TextButton(
-          onPressed: () => setState(() => controllers.add(TextEditingController())),
+          onPressed: () =>
+              setState(() => controllers.add(TextEditingController())),
           child: Text("Add $title"),
         ),
       ],
@@ -150,76 +179,102 @@ class _AddDishScreenState extends State<AddDishScreen> {
       body: _isSaving
           ? const Center(child: CircularProgressIndicator())
           : Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Dish Name
-              TextFormField(
-                controller: nameController,
-                validator: (value) => (value == null || value.trim().isEmpty) ? 'Name is required' : null,
-                decoration: const InputDecoration(labelText: "Dish Name"),
-              ),
-              const SizedBox(height: 12),
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Dish Name
+                    TextFormField(
+                      controller: nameController,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                          ? 'Name is required'
+                          : null,
+                      decoration: const InputDecoration(labelText: "Dish Name"),
+                    ),
+                    const SizedBox(height: 12),
 
-              // Description
-              TextFormField(
-                controller: descriptionController,
-                validator: (value) => (value == null || value.trim().isEmpty) ? 'Description is required' : null,
-                decoration: const InputDecoration(labelText: "Description"),
-              ),
-              const SizedBox(height: 12),
+                    // Description
+                    TextFormField(
+                      controller: descriptionController,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                          ? 'Description is required'
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: "Description",
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-              // Status
-              DropdownButtonFormField<String>(
-                initialValue: status,
-                items: const [
-                  DropdownMenuItem(value: "finalized", child: Text("Finalized")),
-                  DropdownMenuItem(value: "in_testing", child: Text("In Testing")),
-                  DropdownMenuItem(value: "abandoned", child: Text("Abandoned")),
-                ],
-                onChanged: (value) => setState(() => status = value!),
-                decoration: const InputDecoration(labelText: "Status"),
-              ),
-              const SizedBox(height: 16),
+                    // Status
+                    DropdownButtonFormField<String>(
+                      initialValue: status,
+                      items: const [
+                        DropdownMenuItem(
+                          value: "finalized",
+                          child: Text("Finalized"),
+                        ),
+                        DropdownMenuItem(
+                          value: "in_testing",
+                          child: Text("In Testing"),
+                        ),
+                        DropdownMenuItem(
+                          value: "abandoned",
+                          child: Text("Abandoned"),
+                        ),
+                      ],
+                      onChanged: (value) => setState(() => status = value!),
+                      decoration: const InputDecoration(labelText: "Status"),
+                    ),
+                    const SizedBox(height: 16),
 
-              // Ingredients
-              _buildDynamicList("Ingredient", ingredientControllers),
-              const SizedBox(height: 16),
+                    // Ingredients
+                    RecipePhotos(
+                      service: _photoService,
+                      paths: _photoPaths,
+                      pending: _photos,
+                      onChanged: () {},
+                    ),
+                    const SizedBox(height: 16),
+                    _buildDynamicList("Ingredient", ingredientControllers),
+                    const SizedBox(height: 16),
 
-              // Directions
-              _buildDynamicList("Step", directionControllers),
-              const SizedBox(height: 16),
+                    // Directions
+                    _buildDynamicList("Step", directionControllers),
+                    const SizedBox(height: 16),
 
-              // Tags
-              TextFormField(
-                controller: tagsController,
-                decoration: const InputDecoration(labelText: "Tags (comma separated)"),
-              ),
-              const SizedBox(height: 12),
+                    // Tags
+                    TextFormField(
+                      controller: tagsController,
+                      decoration: const InputDecoration(
+                        labelText: "Tags (comma separated)",
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-              // Notes
-              TextFormField(
-                controller: notesController,
-                decoration: const InputDecoration(labelText: "Notes"),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 24),
+                    // Notes
+                    TextFormField(
+                      controller: notesController,
+                      decoration: const InputDecoration(labelText: "Notes"),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 24),
 
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveDish,
-                  child: const Text("Save Dish"),
+                    // Save Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isSaving ? null : _saveDish,
+                        child: const Text("Save Dish"),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

@@ -1,88 +1,70 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'config/supabase_config.dart';
+import 'services/backend_client.dart';
+export 'services/backend_client.dart'
+    show AuthState, AuthChangeEvent, AuthException, ApiException;
 
-final supabase = Supabase.instance.client;
-
-/// ------------------------------
-/// Sign up with email
-/// ------------------------------
-Future<void> signUp(String email, String password) async {
-  await supabase.auth.signUp(email: email, password: password);
-}
-
-/// ------------------------------
-/// Login with email
-/// ------------------------------
-Future<void> signIn(String email, String password) async {
-  final res = await supabase.auth.signInWithPassword(
-    email: email,
-    password: password,
-  );
-
-  final user = res.user;
-
-  if (user == null) {
-    throw Exception('No authenticated user returned.');
-  }
-}
-
-/// ------------------------------
-/// Send Password Reset Email
-/// ------------------------------
+final backend = BackendClient.instance;
+Future<void> signUp(String email, String password) =>
+    backend.signUp(email, password);
+Future<void> signIn(String email, String password) =>
+    backend.signIn(email, password);
+Future<void> signOut() => backend.signOut();
+Future<void> signInWithGoogle() => backend.googleSignIn();
 Future<void> sendPasswordResetEmail(String email) async {
-  await supabase.auth.resetPasswordForEmail(
-    email,
-    redirectTo: SupabaseConfig.redirectUrl,
+  await backend.request(
+    'POST',
+    'auth/email-otp/send-verification-otp',
+    body: {'email': email, 'type': 'forget-password'},
   );
 }
 
-/// ------------------------------
-/// Google Login
-/// ------------------------------
-Future<void> signInWithGoogle() async {
-  try {
-    await supabase.auth.signInWithOAuth(
-      OAuthProvider.google,
-      redirectTo: SupabaseConfig.redirectUrl,
-      scopes: 'openid email profile',
-    );
-  } on AuthException catch (e) {
-    throw Exception('Google sign-in failed: ${e.message}');
-  } catch (e) {
-    throw Exception(
-      'Google sign-in failed. Check that Google is enabled in Supabase Auth and that the redirect URL is configured: ${SupabaseConfig.redirectUrl}',
-    );
-  }
+Future<void> resetPasswordWithCode(
+  String email,
+  String code,
+  String password,
+) async {
+  await backend.request(
+    'POST',
+    'auth/email-otp/reset-password',
+    body: {'email': email, 'otp': code, 'password': password},
+  );
 }
 
-/// ------------------------------
-/// Update Email
-/// ------------------------------
-Future<void> updateEmail(String newEmail) async {
-  await supabase.auth.updateUser(UserAttributes(email: newEmail));
+Future<void> updateEmail(String email) async {
+  await backend.request(
+    'POST',
+    'auth/change-email',
+    body: {'newEmail': email, 'callbackURL': '${backend.baseUrl}/'},
+  );
 }
 
-/// ------------------------------
-/// Update Password
-/// ------------------------------
-Future<void> updatePassword(String newPassword) async {
-  await supabase.auth.updateUser(UserAttributes(password: newPassword));
+Future<void> updatePassword(
+  String password, {
+  required String currentPassword,
+}) async {
+  await backend.request(
+    'POST',
+    'auth/change-password',
+    body: {
+      'newPassword': password,
+      'currentPassword': currentPassword,
+      'revokeOtherSessions': true,
+    },
+  );
 }
 
-/// ------------------------------
-/// Delete Account
-/// ------------------------------
-Future<void> deleteAccount() async {
-  // Note: Supabase doesn't allow users to delete themselves via the client SDK
-  // for security reasons by default. This usually requires a service role or a custom RPC.
-  // For this implementation, we will sign out and provide a placeholder for the actual deletion.
-  await signOut();
-  // throw Exception("Account deletion requires admin privileges or custom RPC.");
+Future<void> sendVerificationCode(String email) async {
+  await backend.request(
+    'POST',
+    'auth/email-otp/send-verification-otp',
+    body: {'email': email, 'type': 'email-verification'},
+  );
 }
 
-/// ------------------------------
-/// Sign Out
-/// ------------------------------
-Future<void> signOut() async {
-  await supabase.auth.signOut();
+Future<void> verifyEmailCode(String email, String code) async {
+  await backend.request(
+    'POST',
+    'auth/email-otp/verify-email',
+    body: {'email': email, 'otp': code},
+  );
+  await backend.refreshSession();
 }

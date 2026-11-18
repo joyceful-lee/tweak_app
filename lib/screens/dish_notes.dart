@@ -33,14 +33,18 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
   Future<void> _loadVersions() async {
     setState(() => _isLoading = true);
     try {
-      final versions = await widget.dishService.fetchDishVersions(widget.dish.id);
-      versions.sort((a, b) => b.versionNumber.compareTo(a.versionNumber)); // newest first
+      final versions = await widget.dishService.fetchDishVersions(
+        widget.dish.id,
+      );
+      versions.sort(
+        (a, b) => b.versionNumber.compareTo(a.versionNumber),
+      ); // newest first
       setState(() => _versions = versions);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load versions: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load versions: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -71,13 +75,13 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
     final Widget body = !_highlightDiff
         ? Text(currentValue, style: const TextStyle(height: 1.35))
         : RichText(
-      text: buildDiffSpanWords(
-        oldText: olderValue,
-        newText: currentValue,
-        context: context,
-        showDeletions: _showDeletions,
-      ),
-    );
+            text: buildDiffSpanWords(
+              oldText: olderValue,
+              newText: currentValue,
+              context: context,
+              showDeletions: _showDeletions,
+            ),
+          );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -96,10 +100,17 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
     required String title,
     required List<String> olderItems,
     required List<String> currentItems,
-    required String Function(int index, String item) prefixBuilder, // bullet/number
+    required String Function(int index, String item)
+    prefixBuilder, // bullet/number
   }) {
-    final olderClean = olderItems.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-    final currentClean = currentItems.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final olderClean = olderItems
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final currentClean = currentItems
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
 
     if (olderClean.isEmpty && currentClean.isEmpty) {
       return const SizedBox.shrink();
@@ -152,15 +163,17 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
 
       if (c.op == DiffOp.insert) {
         final prefix = prefixBuilder(currentIndexForPrefix, c.text);
-        lines.add(_lineRich(
-          text: "$prefix${c.text}",
-          style: TextStyle(
-            color: cs.secondary,
-            fontWeight: FontWeight.w400,
-            fontSize: 14,
-            fontStyle: FontStyle.italic,
+        lines.add(
+          _lineRich(
+            text: "$prefix${c.text}",
+            style: TextStyle(
+              color: cs.secondary,
+              fontWeight: FontWeight.w400,
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ));
+        );
         currentIndexForPrefix++;
         continue;
       }
@@ -168,17 +181,19 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
       if (c.op == DiffOp.delete) {
         if (!_showDeletions) continue;
 
-        lines.add(_lineRich(
-          text: "× ${c.text}",
-          style: TextStyle(
-            color: cs.error,
-            decoration: TextDecoration.lineThrough,
-            decorationColor: cs.error.withValues(alpha: .8),
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            fontStyle: FontStyle.italic,
+        lines.add(
+          _lineRich(
+            text: "× ${c.text}",
+            style: TextStyle(
+              color: cs.error,
+              decoration: TextDecoration.lineThrough,
+              decorationColor: cs.error.withValues(alpha: .8),
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ));
+        );
         continue;
       }
     }
@@ -224,7 +239,8 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("${widget.dish.name} • Notes",
+        title: Text(
+          "${widget.dish.name} • Notes",
           style: TextStyle(fontSize: 14),
         ),
         backgroundColor: cs.onSurface,
@@ -232,152 +248,178 @@ class _DishAllNotesScreenState extends State<DishAllNotesScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-        onRefresh: _loadVersions,
-        child: indicesWithNotes.isEmpty
-            ? ListView(
-          children: const [
-            SizedBox(height: 80),
-            Center(child: Text("No notes found in any version.")),
-          ],
-        )
-            : ListView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text("Show changes"),
-                      value: _showChanges,
-                      onChanged: (v) => setState(() => _showChanges = v),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text("Show removed items"),
-                      subtitle: const Text("Removed items show as strikethrough"),
-                      value: _showDeletions,
-                      onChanged: _showChanges ? (v) => setState(() => _showDeletions = v) : null,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...indicesWithNotes.map((i) {
-              final current = _versions[i];
-              final older = (i + 1 < _versions.length) ? _versions[i + 1] : null;
+              onRefresh: _loadVersions,
+              child: indicesWithNotes.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 80),
+                        Center(child: Text("No notes found in any version.")),
+                      ],
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                      children: [
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                            child: Column(
+                              children: [
+                                SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text("Show changes"),
+                                  value: _showChanges,
+                                  onChanged: (v) =>
+                                      setState(() => _showChanges = v),
+                                ),
+                                SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text("Show removed items"),
+                                  subtitle: const Text(
+                                    "Removed items show as strikethrough",
+                                  ),
+                                  value: _showDeletions,
+                                  onChanged: _showChanges
+                                      ? (v) =>
+                                            setState(() => _showDeletions = v)
+                                      : null,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...indicesWithNotes.map((i) {
+                          final current = _versions[i];
+                          final older = (i + 1 < _versions.length)
+                              ? _versions[i + 1]
+                              : null;
 
-              final isVersionOne = older == null || current.versionNumber == 1;
-              final dateStr = current.createdAt.toIso8601String().split('T').first;
+                          final isVersionOne =
+                              older == null || current.versionNumber == 1;
+                          final dateStr = current.createdAt
+                              .toIso8601String()
+                              .split('T')
+                              .first;
 
-              final notesText = current.notes.trim();
+                          final notesText = current.notes.trim();
 
-              // TEXT fields
-              final curStatus = _statusText(current);
-              final curTags = _tagsText(current);
-              final oldStatus = older == null ? "" : _statusText(older);
-              final oldTags = older == null ? "" : _tagsText(older);
+                          // TEXT fields
+                          final curStatus = _statusText(current);
+                          final curTags = _tagsText(current);
+                          final oldStatus = older == null
+                              ? ""
+                              : _statusText(older);
+                          final oldTags = older == null ? "" : _tagsText(older);
 
-              // LIST fields (diff by list item)
-              final curIngredients = current.ingredients;
-              final oldIngredients = older == null ? const <String>[] : older.ingredients;
+                          // LIST fields (diff by list item)
+                          final curIngredients = current.ingredients;
+                          final oldIngredients = older == null
+                              ? const <String>[]
+                              : older.ingredients;
 
-              final curDirections = current.directions;
-              final oldDirections = older == null ? const <String>[] : older.directions;
+                          final curDirections = current.directions;
+                          final oldDirections = older == null
+                              ? const <String>[]
+                              : older.directions;
 
-              Widget changesSection = const SizedBox.shrink();
-              if (_showChanges && !isVersionOne) {
-                final fields = <Widget>[
-                  _buildTextFieldDiff(
-                    title: "Status",
-                    olderValue: oldStatus,
-                    currentValue: curStatus,
-                  ),
-                  _buildTextFieldDiff(
-                    title: "Tags",
-                    olderValue: oldTags,
-                    currentValue: curTags,
-                  ),
-                  _buildListFieldDiff(
-                    title: "Ingredients",
-                    olderItems: oldIngredients,
-                    currentItems: curIngredients,
-                    prefixBuilder: (_, _) => "• ",
-                  ),
-                  _buildListFieldDiff(
-                    title: "Directions",
-                    olderItems: oldDirections,
-                    currentItems: curDirections,
-                    prefixBuilder: (idx, _) => "${idx + 1}. ",
-                  ),
-                ].where((w) => w is! SizedBox).toList();
+                          Widget changesSection = const SizedBox.shrink();
+                          if (_showChanges && !isVersionOne) {
+                            final fields = <Widget>[
+                              _buildTextFieldDiff(
+                                title: "Status",
+                                olderValue: oldStatus,
+                                currentValue: curStatus,
+                              ),
+                              _buildTextFieldDiff(
+                                title: "Tags",
+                                olderValue: oldTags,
+                                currentValue: curTags,
+                              ),
+                              _buildListFieldDiff(
+                                title: "Ingredients",
+                                olderItems: oldIngredients,
+                                currentItems: curIngredients,
+                                prefixBuilder: (_, _) => "• ",
+                              ),
+                              _buildListFieldDiff(
+                                title: "Directions",
+                                olderItems: oldDirections,
+                                currentItems: curDirections,
+                                prefixBuilder: (idx, _) => "${idx + 1}. ",
+                              ),
+                            ].where((w) => w is! SizedBox).toList();
 
-                final hasAnyField = fields.isNotEmpty;
-                if (!_highlightDiff || hasAnyField) {
-                  changesSection = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Changes",
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 8),
-                      ...fields,
-                      const SizedBox(height: 2),
-                    ],
-                  );
-                }
-              }
+                            final hasAnyField = fields.isNotEmpty;
+                            if (!_highlightDiff || hasAnyField) {
+                              changesSection = Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Changes",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...fields,
+                                  const SizedBox(height: 2),
+                                ],
+                              );
+                            }
+                          }
 
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              "Version ${current.versionNumber}",
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                          return Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          "Version ${current.versionNumber}",
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        dateStr,
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.color
+                                              ?.withValues(alpha: .8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  changesSection,
+                                  const Text(
+                                    "Notes",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    notesText,
+                                    style: const TextStyle(height: 1.35),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Text(
-                            dateStr,
-                            style: TextStyle(
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.color
-                                  ?.withValues(alpha: .8),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      changesSection,
-                      const Text(
-                        "Notes",
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(notesText, style: const TextStyle(height: 1.35)),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
+                          );
+                        }),
+                      ],
+                    ),
+            ),
     );
   }
 }
@@ -460,17 +502,16 @@ TextSpan buildDiffSpanWords({
         case DiffOp.insert:
           return TextSpan(
             text: c.text,
-            style: baseStyle.copyWith(
-              fontSize: 12,
-              color: cs.primary,
-            ),
+            style: baseStyle.copyWith(fontSize: 12, color: cs.primary),
           );
         case DiffOp.delete:
           if (!showDeletions) return const TextSpan(text: "");
           return TextSpan(
             text: c.text,
             style: baseStyle.copyWith(
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: .5),
+              color: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.color?.withValues(alpha: .5),
             ),
           );
       }

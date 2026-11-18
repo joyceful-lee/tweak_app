@@ -1,4 +1,4 @@
-package com.example.tweak_app
+package com.tweak.myapp
 
 import io.flutter.embedding.android.FlutterActivity
 

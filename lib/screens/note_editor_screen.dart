@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../auth.dart';
 import '../models/note.dart';
 import '../services/note_service.dart';
 
@@ -15,7 +15,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _tagController = TextEditingController();
-  final _noteService = NoteService(Supabase.instance.client);
+  final _noteService = NoteService(backend);
   List<String> _tags = [];
   bool _isSaving = false;
 
@@ -53,9 +53,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   Future<void> _save() async {
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Title cannot be empty")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Title cannot be empty")));
       return;
     }
 
@@ -79,9 +79,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error saving note: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error saving note: $e")));
     } finally {
       setState(() => _isSaving = false);
     }
@@ -105,10 +105,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ),
             )
           else
-            IconButton(
-              icon: const Icon(Icons.check),
-              onPressed: _save,
-            ),
+            IconButton(icon: const Icon(Icons.check), onPressed: _save),
         ],
       ),
       body: Padding(
@@ -128,11 +125,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             Wrap(
               spacing: 8,
               children: [
-                ..._tags.map((tag) => Chip(
-                  label: Text(tag, style: const TextStyle(fontSize: 12)),
-                  onDeleted: () => _removeTag(tag),
-                  visualDensity: VisualDensity.compact,
-                )),
+                ..._tags.map(
+                  (tag) => Chip(
+                    label: Text(tag, style: const TextStyle(fontSize: 12)),
+                    onDeleted: () => _removeTag(tag),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
                 SizedBox(
                   width: 100,
                   child: TextField(

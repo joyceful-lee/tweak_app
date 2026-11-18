@@ -35,8 +35,8 @@ class Dish {
           : null,
       versions: map['dish_versions'] != null
           ? (map['dish_versions'] as List)
-          .map((v) => DishVersion.fromMap(Map<String, dynamic>.from(v)))
-          .toList()
+                .map((v) => DishVersion.fromMap(Map<String, dynamic>.from(v)))
+                .toList()
           : const [],
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
@@ -61,6 +61,7 @@ class Dish {
 /// Lower-level info about a recipe (details like ingredients, etc)
 /// ------------------------------
 class DishVersion {
+  final List<String> photoPaths;
   final String id;
   final String dishId;
   final int versionNumber;
@@ -72,6 +73,7 @@ class DishVersion {
   final DateTime createdAt;
 
   DishVersion({
+    this.photoPaths = const [],
     required this.id,
     required this.dishId,
     required this.versionNumber,
@@ -85,6 +87,7 @@ class DishVersion {
 
   factory DishVersion.fromMap(Map<String, dynamic> map) {
     return DishVersion(
+      photoPaths: List<String>.from(map['photo_paths'] ?? []),
       id: map['id'].toString(),
       dishId: map['dish_id'].toString(),
       versionNumber: map['version_number'] ?? 1,
@@ -94,31 +97,32 @@ class DishVersion {
       tags: List<String>.from(map['tags'] ?? []),
       status: map['status'] ?? 'in_testing',
       createdAt: map['created_at'] != null
-        ? DateTime.parse(map['created_at'])
-        : DateTime.now(),
+          ? DateTime.parse(map['created_at'])
+          : DateTime.now(),
     );
   }
 
   factory DishVersion.fromJson(Map<String, dynamic> json) {
     return DishVersion(
+      photoPaths: List<String>.from(json['photo_paths'] ?? []),
       id: json['id'].toString(),
       dishId: json['dish_id'].toString(),
       versionNumber: json['version_number'] ?? 1,
-      ingredients:
-      List<String>.from(json['ingredients'] ?? []),
-      directions:
-      List<String>.from(json['directions'] ?? []),
+      ingredients: List<String>.from(json['ingredients'] ?? []),
+      directions: List<String>.from(json['directions'] ?? []),
       notes: json['notes'] ?? '',
-      tags:
-      List<String>.from(json['tags'] ?? []),
+      tags: List<String>.from(json['tags'] ?? []),
       status: json['status'] ?? 'in_testing',
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'dish_id': dishId,
+      'photo_paths': photoPaths,
       'version_number': versionNumber,
       'ingredients': ingredients,
       'directions': directions,

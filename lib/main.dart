@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth.dart';
 import 'package:tweak_app/app_theme.dart';
 
 // screen routes
-import 'config/supabase_config.dart';
 import 'screens/dish_list.dart';
 import 'screens/main_screen.dart';
 import 'screens/login_screen.dart';
@@ -16,13 +15,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
-    authOptions: const FlutterAuthClientOptions(
-      authFlowType: AuthFlowType.implicit,
-    ),
-  );
+  await backend.initialize();
 
   runApp(const MyApp());
 }
@@ -42,7 +35,10 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = backend.authChanges.listen((data) {
+      if (data.event == AuthChangeEvent.signedOut) {
+        navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      }
       if (data.event == AuthChangeEvent.passwordRecovery) {
         _showPasswordRecovery();
       }
@@ -62,9 +58,7 @@ class _MyAppState extends State<MyApp> {
 
     _isShowingRecovery = true;
     navigator
-        .push(
-          MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
-        )
+        .push(MaterialPageRoute(builder: (_) => const ResetPasswordScreen()))
         .whenComplete(() => _isShowingRecovery = false);
   }
 
@@ -79,6 +73,15 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Tweak',
+      builder: (context, child) => ColoredBox(
+        color: Theme.of(context).colorScheme.surface,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: child,
+          ),
+        ),
+      ),
       theme: ThemeData(
         colorScheme: earthyLightScheme,
         useMaterial3: true,
@@ -100,18 +103,22 @@ class _MyAppState extends State<MyApp> {
           color: earthyLightScheme.surface,
           surfaceTintColor: Colors.transparent,
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
 
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.disabled)) {
-                return earthyLightScheme.tertiary.withValues(alpha:0.5);
+                return earthyLightScheme.tertiary.withValues(alpha: 0.5);
               }
               return earthyLightScheme.primary;
             }),
-            foregroundColor: WidgetStateProperty.all(earthyLightScheme.onPrimary),
+            foregroundColor: WidgetStateProperty.all(
+              earthyLightScheme.onPrimary,
+            ),
             shape: WidgetStateProperty.all(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
@@ -123,14 +130,18 @@ class _MyAppState extends State<MyApp> {
 
         textButtonTheme: TextButtonThemeData(
           style: ButtonStyle(
-            foregroundColor: WidgetStateProperty.all(earthyLightScheme.secondary),
+            foregroundColor: WidgetStateProperty.all(
+              earthyLightScheme.secondary,
+            ),
           ),
         ),
 
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: earthyLightScheme.surface,
-          labelStyle: TextStyle(color: earthyLightScheme.onSurface.withValues(alpha:0.75)),
+          labelStyle: TextStyle(
+            color: earthyLightScheme.onSurface.withValues(alpha: 0.75),
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: earthyLightScheme.tertiary),
@@ -146,20 +157,22 @@ class _MyAppState extends State<MyApp> {
         ),
 
         chipTheme: ChipThemeData(
-          backgroundColor: earthyLightScheme.tertiary.withValues(alpha:0.45),
+          backgroundColor: earthyLightScheme.tertiary.withValues(alpha: 0.45),
           labelStyle: TextStyle(color: earthyLightScheme.onSurface),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
         ),
 
         snackBarTheme: SnackBarThemeData(
           backgroundColor: earthyLightScheme.inverseSurface,
-          contentTextStyle: TextStyle(color: earthyLightScheme.onInverseSurface),
+          contentTextStyle: TextStyle(
+            color: earthyLightScheme.onInverseSurface,
+          ),
         ),
       ),
       home: const AuthGate(),
-      routes: {
-        '/dish-list': (_) => const DishListScreen(),
-      },
+      routes: {'/dish-list': (_) => const DishListScreen()},
     );
   }
 }
@@ -169,17 +182,21 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = Supabase.instance.client.auth;
+    final auth = backend;
     return StreamBuilder<AuthState>(
-      stream: auth.onAuthStateChange,
+      stream: auth.authChanges,
+      initialData: const AuthState(AuthChangeEvent.initialSession),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
-        return auth.currentSession == null
+        return auth.currentUser == null
             ? const LoginScreen()
-            : const MainScreen();
+            : MainScreen(key: ValueKey(backend.accountRevision));
       },
     );
   }

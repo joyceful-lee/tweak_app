@@ -1,173 +1,189 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth.dart';
 import '../services/dish_service.dart';
 import '../services/note_service.dart';
 import '../services/export_service.dart';
+import '../widgets/account_actions.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
 
-  Future<void> _changeEmail(BuildContext context) async {
-    final controller = TextEditingController();
-    final newEmail = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Change Email"),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: "New Email"),
-          keyboardType: TextInputType.emailAddress,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text("Update")),
-        ],
-      ),
-    );
-
-    if (newEmail != null && newEmail.isNotEmpty) {
-      try {
-        await updateEmail(newEmail);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Email update initiated. Check your inbox.")),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-        }
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _busy = false;
+  Future<void> _run(Future<void> Function() action, String success) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(success)));
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _changePassword(BuildContext context) async {
-    final controller = TextEditingController();
-    final newPassword = await showDialog<String>(
+  Future<void> _password() async {
+    final old = TextEditingController(), next = TextEditingController();
+    final save = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Change Password"),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: "New Password"),
-          obscureText: true,
+        title: const Text('Change password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: old,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Current password'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: next,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New password'),
+            ),
+          ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text("Update")),
-        ],
-      ),
-    );
-
-    if (newPassword != null && newPassword.isNotEmpty) {
-      try {
-        await updatePassword(newPassword);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Password updated successfully.")),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-        }
-      }
-    }
-  }
-
-  Future<void> _handleDeleteAccount(BuildContext context) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Delete Account"),
-        content: const Text(
-          "WARNING: This action is permanent and cannot be undone. All your data will be lost.",
-          style: TextStyle(color: Colors.red),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete Everything"),
+            child: const Text('Update'),
           ),
         ],
       ),
     );
-
-    if (confirm == true) {
-      try {
-        await deleteAccount();
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-        }
-      }
+    if (save == true) {
+      await _run(
+        () => updatePassword(next.text, currentPassword: old.text),
+        'Password updated.',
+      );
     }
+    old.dispose();
+    next.dispose();
+  }
+
+  Future<void> _email() async {
+    final email = TextEditingController();
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change email'),
+        content: TextField(
+          controller: email,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'New email'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+    if (save == true) {
+      await _run(
+        () => updateEmail(email.text.trim()),
+        'Check your email to confirm the change.',
+      );
+    }
+    email.dispose();
+  }
+
+  Future<void> _restore() async {
+    await verifyEmailDialog(
+      context,
+      backend.currentUser?.email ?? '',
+      restore: true,
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
-    final user = Supabase.instance.client.auth.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Settings")),
-      body: ListView(
-        children: [
-          if (user != null)
-            ListTile(
-              title: const Text("Logged in as"),
-              subtitle: Text(user.email ?? "Unknown"),
-              leading: const Icon(Icons.person_outline),
-            ),
-          const Divider(),
-          ListTile(
-            title: const Text("Change Email"),
-            leading: const Icon(Icons.email_outlined),
-            onTap: () => _changeEmail(context),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Settings')),
+    body: ListView(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.person_outline),
+          title: const Text('Signed in as'),
+          subtitle: Text(backend.currentUser?.email ?? ''),
+        ),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.mark_email_read_outlined),
+          title: const Text('Verify email'),
+          subtitle: const Text(
+            'Required to restore recipes from your previous account.',
           ),
-          ListTile(
-            title: const Text("Change Password"),
-            leading: const Icon(Icons.lock_outline),
-            onTap: () => _changePassword(context),
-          ),
-          ListTile(
-            title: const Text("Export Data"),
-            leading: const Icon(Icons.download_outlined),
-            onTap: () async {
-              try {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Preparing export...")),
-                );
-                final supabase = Supabase.instance.client;
-                await ExportService.exportAllData(
-                  dishService: DishService(supabase),
-                  noteService: NoteService(supabase),
-                );
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Export failed: $e")),
+          onTap: _busy
+              ? null
+              : () async {
+                  await verifyEmailDialog(
+                    context,
+                    backend.currentUser?.email ?? '',
                   );
-                }
-              }
-            },
+                  if (mounted) setState(() {});
+                },
+        ),
+        ListTile(
+          leading: const Icon(Icons.restore),
+          title: const Text('Restore imported recipes'),
+          subtitle: const Text(
+            'Use the same verified email as your previous account.',
           ),
-          const Divider(),
-          ListTile(
-            title: const Text("Logout"),
-            leading: const Icon(Icons.logout),
-            onTap: () => signOut(),
-          ),
-          ListTile(
-            title: const Text("Delete Account"),
-            textColor: Colors.red,
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
-            onTap: () => _handleDeleteAccount(context),
-          ),
-        ],
-      ),
-    );
-  }
+          onTap: _busy ? null : _restore,
+        ),
+        ListTile(
+          leading: const Icon(Icons.email_outlined),
+          title: const Text('Change email'),
+          onTap: _busy ? null : _email,
+        ),
+        ListTile(
+          leading: const Icon(Icons.lock_outline),
+          title: const Text('Change password'),
+          onTap: _busy ? null : _password,
+        ),
+        ListTile(
+          leading: const Icon(Icons.download_outlined),
+          title: const Text('Export data'),
+          onTap: _busy
+              ? null
+              : () => _run(
+                  () => ExportService.exportAllData(
+                    dishService: DishService(backend),
+                    noteService: NoteService(backend),
+                  ),
+                  'Export prepared.',
+                ),
+        ),
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.logout),
+          title: const Text('Sign out'),
+          onTap: _busy ? null : () => _run(signOut, 'Signed out.'),
+        ),
+        if (_busy) const LinearProgressIndicator(),
+      ],
+    ),
+  );
 }

@@ -15,7 +15,7 @@ final ColorScheme earthyLightScheme = ColorScheme(
   onPrimary: Color(0xFFF1EFEA), // parchment
   secondary: Color(0xFF6B8E4E),
   onSecondary: Color(0xFFF1EFEA), // parchment
-  tertiary: Color(0xFFD6C3A1),  // 0xFFD6C3A1
+  tertiary: Color(0xFFD6C3A1), // 0xFFD6C3A1
   onTertiary: Color(0xFF1F2421), // carbon black
   onTertiaryFixedVariant: Color(0xFFDFDCD6),
   surface: Colors.white,

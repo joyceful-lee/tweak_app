@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../auth.dart';
 
 import '../app_theme.dart';
 import '../models/dish.dart';
@@ -9,8 +9,6 @@ import '../services/dish_service.dart';
 import 'add_dish_screen.dart';
 import 'dish_versions.dart';
 import 'dish_notes.dart';
-
-final supabase = Supabase.instance.client;
 
 enum DishStatus { completed, inProgress, abandoned }
 
@@ -49,11 +47,7 @@ _StatusMeta _statusMeta(DishStatus status, ColorScheme cs) {
         cs.onSecondary,
       );
     case DishStatus.inProgress:
-      return _StatusMeta(
-          "In progress",
-          cs.primary,
-          cs.primary,
-          cs.onPrimary);
+      return _StatusMeta("In progress", cs.primary, cs.primary, cs.onPrimary);
     case DishStatus.abandoned:
       return _StatusMeta(
         "Abandoned",
@@ -72,7 +66,8 @@ IconData _iconForTags(List<String> tags) {
   const iconMappings = <List<String>, IconData>{
     ['blended']: Icons.blender_outlined,
     ['bread', 'loaf']: Icons.breakfast_dining_outlined,
-    ['burger', 'burgers', 'sandwich', 'sandwiches']: Icons.lunch_dining_outlined,
+    ['burger', 'burgers', 'sandwich', 'sandwiches']:
+        Icons.lunch_dining_outlined,
     ['cake', 'birthday']: Icons.cake_outlined,
     ['cookie']: Icons.cookie_outlined,
     ['croissant', 'pastry']: Icons.bakery_dining_outlined,
@@ -121,8 +116,9 @@ class DishListScreen extends StatefulWidget {
   State<DishListScreen> createState() => _DishListScreenState();
 }
 
-class _DishListScreenState extends State<DishListScreen> {
-  final DishService _dishService = DishService(supabase);
+class _DishListScreenState extends State<DishListScreen>
+    with WidgetsBindingObserver {
+  final DishService _dishService = DishService(backend);
 
   List<Dish> _dishes = [];
   bool _isLoading = true;
@@ -139,33 +135,42 @@ class _DishListScreenState extends State<DishListScreen> {
   @override
   void initState() {
     super.initState();
-    if (supabase.auth.currentUser != null) {
+    WidgetsBinding.instance.addObserver(this);
+    if (backend.currentUser != null) {
       _loadDishes();
     }
 
     _searchController.addListener(() {
       if (mounted) {
-        setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
+        setState(
+          () => _searchQuery = _searchController.text.trim().toLowerCase(),
+        );
       }
     });
 
     // Listen for auth changes and reload dishes when a user signs in
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
-      (event) {
-        if (Supabase.instance.client.auth.currentUser != null) {
-          _loadDishes();
-        } else {
-          if (mounted) setState(() => _dishes = []);
-        }
-      },
-    );
+    _authSubscription = backend.authChanges.listen((event) {
+      if (backend.currentUser != null) {
+        _loadDishes();
+      } else {
+        if (mounted) setState(() => _dishes = []);
+      }
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && backend.currentUser != null) {
+      _loadDishes();
+    }
   }
 
   Future<void> _loadDishes() async {
@@ -250,9 +255,7 @@ class _DishListScreenState extends State<DishListScreen> {
 
     // 1. Status Filter
     if (_filter != null) {
-      list = list
-          .where((d) => _statusFromString(d.status) == _filter)
-          .toList();
+      list = list.where((d) => _statusFromString(d.status) == _filter).toList();
     }
 
     // 2. Tag Filter
@@ -290,11 +293,12 @@ class _DishListScreenState extends State<DishListScreen> {
 
   Widget _buildSearchBar(ColorScheme cs) {
     // Extract unique tags from all dishes
-    final allTags = _dishes
-        .expand((d) => d.bestVersion?.tags ?? <String>[])
-        .toSet()
-        .toList()
-      ..sort();
+    final allTags =
+        _dishes
+            .expand((d) => d.bestVersion?.tags ?? <String>[])
+            .toSet()
+            .toList()
+          ..sort();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -309,11 +313,11 @@ class _DishListScreenState extends State<DishListScreen> {
                 prefixIcon: Icon(Icons.search, color: cs.primary),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
                     : null,
                 filled: true,
                 fillColor: cs.surface,
@@ -365,7 +369,9 @@ class _DishListScreenState extends State<DishListScreen> {
               MenuItemButton(
                 onPressed: () => setState(() => _sortByAlpha = !_sortByAlpha),
                 leadingIcon: Icon(
-                  _sortByAlpha ? Icons.check_box : Icons.check_box_outline_blank,
+                  _sortByAlpha
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank,
                   size: 20,
                   color: cs.primary,
                 ),
@@ -379,7 +385,9 @@ class _DishListScreenState extends State<DishListScreen> {
                 )
               else ...[
                 MenuItemButton(
-                  onPressed: _selectedTag == null ? null : () => setState(() => _selectedTag = null),
+                  onPressed: _selectedTag == null
+                      ? null
+                      : () => setState(() => _selectedTag = null),
                   child: Text(
                     "Clear Tag Filter",
                     style: TextStyle(
@@ -465,9 +473,7 @@ class _DishListScreenState extends State<DishListScreen> {
           fontFamily: kBodyFont,
           fontSize: 11,
           color: muted ? cs.onSurface.withValues(alpha: 0.3) : cs.onSurface,
-          fontVariations: [
-            FontVariation('wght', 300),
-          ],
+          fontVariations: [FontVariation('wght', 300)],
         ),
       ),
     );
@@ -490,33 +496,40 @@ class _DishListScreenState extends State<DishListScreen> {
       backgroundColor: cs.onTertiaryFixedVariant,
       appBar: AppBar(
         title: Text("Tweak", style: TextStyle(fontFamily: kTitleFont)),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh recipes',
+            onPressed: _isLoading ? null : _loadDishes,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
         backgroundColor: cs.inverseSurface,
       ),
       bottomNavigationBar: hasSelection
           ? SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.delete_forever),
-              label: const Text("Delete Dish"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                textStyle: TextStyle(
-                  fontFamily: kHeadingFont,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text("Delete Dish"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      textStyle: TextStyle(
+                        fontFamily: kHeadingFont,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: _confirmAndDeleteSelected,
+                  ),
                 ),
               ),
-              onPressed: _confirmAndDeleteSelected,
-            ),
-          ),
-        ),
-      )
+            )
           : null,
 
       body: Column(
@@ -528,245 +541,248 @@ class _DishListScreenState extends State<DishListScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : dishes.isEmpty
                 ? Center(
-              child: Text(
-                _filter == null ? "No dishes yet." : "No dishes here.",
-                style: TextStyle(fontFamily: kBodyFont),
-              ),
-            )
-                : RefreshIndicator(
-              onRefresh: _loadDishes,
-              child: ListView.builder(
-                padding: EdgeInsets.only(bottom: hasSelection ? 90 : 12),
-                itemCount: dishes.length,
-                itemBuilder: (context, index) {
-                  final dish = dishes[index];
-                  final bestVersion = dish.bestVersion;
-                  final isSelected = dish.id == _selectedDishId;
-                  final status = _statusFromString(dish.status);
-                  final meta = _statusMeta(status, cs);
-                  final tags = bestVersion?.tags ?? const <String>[];
-
-                  return Card(
-                    color: isSelected
-                        ? Colors.red.withValues(alpha: 0.08)
-                        : cs.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: isSelected
-                          ? const BorderSide(
-                        color: Colors.red,
-                        width: 1.2,
-                      )
-                          : BorderSide.none,
+                    child: Text(
+                      _filter == null ? "No dishes yet." : "No dishes here.",
+                      style: TextStyle(fontFamily: kBodyFont),
                     ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () async {
-                        if (_selectedDishId != null) {
-                          setState(() {
-                            _selectedDishId = isSelected ? null : dish.id;
-                          });
-                          return;
-                        }
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadDishes,
+                    child: ListView.builder(
+                      padding: EdgeInsets.only(bottom: hasSelection ? 90 : 12),
+                      itemCount: dishes.length,
+                      itemBuilder: (context, index) {
+                        final dish = dishes[index];
+                        final bestVersion = dish.bestVersion;
+                        final isSelected = dish.id == _selectedDishId;
+                        final status = _statusFromString(dish.status);
+                        final meta = _statusMeta(status, cs);
+                        final tags = bestVersion?.tags ?? const <String>[];
 
-                        final action = await showModalBottomSheet<String>(
-                          context: context,
-                          builder: (_) => SafeArea(
-                            child: Wrap(
-                              children: [
-                                ListTile(
-                                  leading: const Icon(Icons.layers),
-                                  title: const Text("View Versions"),
-                                  onTap: () =>
-                                      Navigator.pop(context, "versions"),
-                                ),
-                                ListTile(
-                                  leading: const Icon(
-                                    Icons.sticky_note_2,
-                                  ),
-                                  title: const Text(
-                                    "View Notes (all versions)",
-                                  ),
-                                  onTap: () =>
-                                      Navigator.pop(context, "notes"),
-                                ),
-                              ],
-                            ),
+                        return Card(
+                          color: isSelected
+                              ? Colors.red.withValues(alpha: 0.08)
+                              : cs.surface,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: isSelected
+                                ? const BorderSide(
+                                    color: Colors.red,
+                                    width: 1.2,
+                                  )
+                                : BorderSide.none,
                           ),
-                        );
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () async {
+                              if (_selectedDishId != null) {
+                                setState(() {
+                                  _selectedDishId = isSelected ? null : dish.id;
+                                });
+                                return;
+                              }
 
-                        if (!context.mounted || action == null) return;
-                        if (action == "versions") {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DishVersionsScreen(
-                                dish: dish,
-                                dishService: _dishService,
-                              ),
-                            ),
-                          );
-                          _loadDishes();
-                          return;
-                        }
-
-                        if (action == "notes") {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DishAllNotesScreen(
-                                dish: dish,
-                                dishService: _dishService,
-                              ),
-                            ),
-                          );
-                          _loadDishes();
-                          return;
-                        }
-                      },
-                      onLongPress: () {
-                        setState(() {
-                          _selectedDishId = isSelected ? null : dish.id;
-                        });
-                      },
-                      child: Opacity(
-                        opacity: status == DishStatus.abandoned
-                            ? 0.7
-                            : 1.0,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Thumbnail with status dot
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    width: 56,
-                                    height: 56,
-                                    decoration: BoxDecoration(
-                                      color: cs.tertiary.withValues(
-                                        alpha: 0.3,
+                              final action = await showModalBottomSheet<String>(
+                                context: context,
+                                builder: (_) => SafeArea(
+                                  child: Wrap(
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(Icons.layers),
+                                        title: const Text("View Versions"),
+                                        onTap: () =>
+                                            Navigator.pop(context, "versions"),
                                       ),
-                                      borderRadius: BorderRadius.circular(
-                                        10,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      _iconForTags(tags),
-                                      color: cs.inverseSurface,
-                                      size: 26,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: -3,
-                                    right: -3,
-                                    child: Container(
-                                      width: 14,
-                                      height: 14,
-                                      decoration: BoxDecoration(
-                                        color: meta.dot,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: cs.surface,
-                                          width: 2,
+                                      ListTile(
+                                        leading: const Icon(
+                                          Icons.sticky_note_2,
                                         ),
+                                        title: const Text(
+                                          "View Notes (all versions)",
+                                        ),
+                                        onTap: () =>
+                                            Navigator.pop(context, "notes"),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              );
+
+                              if (!context.mounted || action == null) return;
+                              if (action == "versions") {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DishVersionsScreen(
+                                      dish: dish,
+                                      dishService: _dishService,
                                     ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(width: 12),
-                              // Text content
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      dish.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontFamily: kHeadingFont,
-                                        fontSize: 17,
-                                        fontVariations: [
-                                          FontVariation('wght', 800),
-                                        ],
-                                        color: cs.onSurface,
-                                      ),
+                                );
+                                _loadDishes();
+                                return;
+                              }
+
+                              if (action == "notes") {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DishAllNotesScreen(
+                                      dish: dish,
+                                      dishService: _dishService,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Row(
+                                  ),
+                                );
+                                _loadDishes();
+                                return;
+                              }
+                            },
+                            onLongPress: () {
+                              setState(() {
+                                _selectedDishId = isSelected ? null : dish.id;
+                              });
+                            },
+                            child: Opacity(
+                              opacity: status == DishStatus.abandoned
+                                  ? 0.7
+                                  : 1.0,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Thumbnail with status dot
+                                    Stack(
+                                      clipBehavior: Clip.none,
                                       children: [
                                         Container(
-                                          padding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 2,
-                                          ),
+                                          width: 56,
+                                          height: 56,
                                           decoration: BoxDecoration(
-                                            color: meta.pillBg,
-                                            borderRadius:
-                                            BorderRadius.circular(20),
+                                            color: cs.tertiary.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                           ),
-                                          child: Text(
-                                            meta.label,
+                                          child: Icon(
+                                            _iconForTags(tags),
+                                            color: cs.inverseSurface,
+                                            size: 26,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: -3,
+                                          right: -3,
+                                          child: Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              color: meta.dot,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: cs.surface,
+                                                width: 2,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 12),
+                                    // Text content
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            dish.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
-                                              fontFamily: kBodyFont,
-                                              fontSize: 11,
+                                              fontFamily: kHeadingFont,
+                                              fontSize: 17,
                                               fontVariations: [
                                                 FontVariation('wght', 800),
                                               ],
-                                              color: meta.pillText,
+                                              color: cs.onSurface,
                                             ),
                                           ),
-                                        ),
-                                        if (bestVersion != null) ...[
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            "v${bestVersion.versionNumber}",
-                                            style: TextStyle(
-                                              fontFamily: kBodyFont,
-                                              fontSize: 12,
-                                              color: cs.onSurface
-                                                  .withValues(alpha: 0.5),
-                                            ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: meta.pillBg,
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  meta.label,
+                                                  style: TextStyle(
+                                                    fontFamily: kBodyFont,
+                                                    fontSize: 11,
+                                                    fontVariations: [
+                                                      FontVariation(
+                                                        'wght',
+                                                        800,
+                                                      ),
+                                                    ],
+                                                    color: meta.pillText,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (bestVersion != null) ...[
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  "v${bestVersion.versionNumber}",
+                                                  style: TextStyle(
+                                                    fontFamily: kBodyFont,
+                                                    fontSize: 12,
+                                                    color: cs.onSurface
+                                                        .withValues(alpha: 0.5),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
+                                          if (tags.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            _buildTags(tags, cs),
+                                          ],
+                                          if (isSelected)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 6,
+                                              ),
+                                              child: Text(
+                                                "Selected — tap Delete Dish below",
+                                                style: TextStyle(
+                                                  fontFamily: kBodyFont,
+                                                  color: Colors.red,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ),
                                         ],
-                                      ],
-                                    ),
-                                    if (tags.isNotEmpty) ...[
-                                      const SizedBox(height: 6),
-                                      _buildTags(tags, cs),
-                                    ],
-                                    if (isSelected)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: 6,
-                                        ),
-                                        child: Text(
-                                          "Selected — tap Delete Dish below",
-                                          style: TextStyle(
-                                            fontFamily: kBodyFont,
-                                            color: Colors.red,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        ),
                                       ),
+                                    ),
                                   ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-            ),
+                  ),
           ),
         ],
       ),

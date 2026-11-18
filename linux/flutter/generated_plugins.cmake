@@ -3,7 +3,9 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  gtk
+  app_links_linux
+  file_selector_linux
+  flutter_secure_storage_linux
   printing
   url_launcher_linux
 )

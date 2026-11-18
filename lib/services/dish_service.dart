@@ -1,15 +1,10 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'backend_client.dart';
 import '../models/dish.dart';
 
 class DishService {
-  final SupabaseClient supabase;
-
-  DishService(this.supabase);
-
-  /// ------------------------------
-  /// Create a new dish with its first version
-  /// ------------------------------
+  final BackendClient client;
+  DishService([BackendClient? client])
+    : client = client ?? BackendClient.instance;
   Future<void> createDish({
     required String name,
     required String description,
@@ -18,205 +13,99 @@ class DishService {
     required List<String> directions,
     required String notes,
     required List<String> tags,
+    List<String> photoPaths = const [],
   }) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) throw Exception("User not logged in");
-
-    await supabase.rpc(
-      'create_dish_with_version',
-      params: {
-        'p_user_id': user.id,
-        'p_name': name.trim(),
-        'p_description': description.trim(),
-        'p_status': status,
-        'p_ingredients': ingredients,
-        'p_directions': directions,
-        'p_notes': notes.trim(),
-        'p_tags': tags,
+    await client.request(
+      'POST',
+      'dishes',
+      body: {
+        'name': name,
+        'description': description,
+        'status': status,
+        'ingredients': ingredients,
+        'directions': directions,
+        'notes': notes,
+        'tags': tags,
+        'photo_paths': photoPaths,
       },
     );
   }
 
-  /// ------------------------------
-  /// Fetch all dishes
-  /// ------------------------------
-  Future<List<Dish>> fetchDishes() async {
-    final response = await supabase
-        .from('dishes')
-        .select('''
-          id, name, description, status, best_version, created_at,
-          best:dish_versions!dishes_best_version_fkey (
-            id, dish_id, version_number, tags, directions
-          )
-        ''')
-        .order('created_at', ascending: false);
-
-
-    return (response as List)
-        .map((dish) => Dish.fromMap(dish))
-        .toList();
-  }
-
-  /// ------------------------------
-  /// Fetch all dishes with all versions (for export)
-  /// ------------------------------
-  Future<List<Dish>> fetchAllDishesFull() async {
-    final response = await supabase
-        .from('dishes')
-        .select('''
-          *,
-          dish_versions!dish_versions_dish_id_fkey (*)
-        ''')
-        .order('created_at', ascending: false);
-
-    return (response as List)
-        .map((dish) => Dish.fromMap(dish))
-        .toList();
-  }
-
-  /// ------------------------------
-  /// Fetch all versions of a dish
-  /// ------------------------------
-  Future<List<DishVersion>> fetchDishVersions(String dishId) async {
-    final response = await supabase
-        .from('dish_versions')
-        .select()
-        .eq('dish_id', dishId)
-        .order('version_number');
-
-    return (response as List)
-        .map((json) => DishVersion.fromMap(json as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// ------------------------------
-  /// Fetch by ID
-  /// ------------------------------
-  Future<Map<String, dynamic>> fetchDishById(String dishId) async {
-    final dish = await supabase
-        .from('dishes')
-        .select()
-        .eq('id', dishId)
-        .single();
-    return Map<String, dynamic>.from(dish);
-  }
-
-  /// ------------------------------
-  /// Update Dish Status
-  /// ------------------------------
+  Future<List<Dish>> _fetch(String path) async =>
+      (await client.request('GET', path) as List)
+          .map((value) => Dish.fromMap(Map<String, dynamic>.from(value)))
+          .toList();
+  Future<List<Dish>> fetchDishes() => _fetch('dishes');
+  Future<List<Dish>> fetchAllDishesFull() => _fetch('dishes/export');
+  Future<List<DishVersion>> fetchDishVersions(String id) async =>
+      (await client.request('GET', 'dishes/$id/versions') as List)
+          .map((value) => DishVersion.fromMap(Map<String, dynamic>.from(value)))
+          .toList();
+  Future<Map<String, dynamic>> fetchDishById(String id) async =>
+      Map<String, dynamic>.from(await client.request('GET', 'dishes/$id'));
   Future<void> updateDishStatus({
     required String dishId,
     required String status,
   }) async {
-    await supabase
-        .from('dishes')
-        .update({'status': status})
-        .eq('id', dishId);
+    await client.request('PATCH', 'dishes/$dishId', body: {'status': status});
   }
 
-  /// ------------------------------
-  /// Delete a dish (and its versions)
-  /// ------------------------------
-  Future<void> deleteDish(String dishId) async {
-    // If you have ON DELETE CASCADE on dish_versions.dish_id, you can delete only the dish.
-    // This two-step approach works even without cascade.
-    await supabase.from('dish_versions').delete().eq('dish_id', dishId);
-    await supabase.from('dishes').delete().eq('id', dishId);
+  Future<void> deleteDish(String id) async {
+    await client.request('DELETE', 'dishes/$id');
   }
 
-  /// ------------------------------
-  /// Update an existing version (NO increment)
-  /// ------------------------------
   Future<void> updateDishVersion({
     required String versionId,
     required List<String> ingredients,
     required List<String> directions,
     required String notes,
     required List<String> tags,
+    List<String>? photoPaths,
   }) async {
-    await supabase
-        .from('dish_versions')
-        .update({
-      'ingredients': ingredients,
-      'directions': directions,
-      'notes': notes,
-      'tags': tags,
-    })
-        .eq('id', versionId);
+    await client.request(
+      'PATCH',
+      'versions/$versionId',
+      body: {
+        'ingredients': ingredients,
+        'directions': directions,
+        'notes': notes,
+        'tags': tags,
+        'photo_paths': photoPaths ?? [],
+      },
+    );
   }
 
-  /// ------------------------------
-  /// Add a new version (from the existing one)
-  /// ------------------------------
   Future<Map<String, dynamic>> addDishVersion(
-      String dishId, {
-        required String baseVersionId,
-        required List<String> ingredients,
-        required List<String> directions,
-        required String notes,
-        required List<String> tags,
-      }) async {
-
-    // Get latest version number
-    final latest = await supabase
-        .from('dish_versions')
-        .select('version_number')
-        .eq('dish_id', dishId)
-        .order('version_number', ascending: false)
-        .limit(1)
-        .maybeSingle();
-
-    final nextVersionNumber =
-        (latest?['version_number'] ?? 0) + 1;
-
-    final newVersion = await supabase
-        .from('dish_versions')
-        .insert({
-          'dish_id': dishId,
-          'version_number': nextVersionNumber,
-          'ingredients': ingredients,
-          'directions': directions,
-          'notes': notes,
-          'tags': tags,
-        })
-        .select()
-        .single();
-
-    return newVersion;
-  }
-
-  /// ------------------------------
-  /// Delete a version
-  /// ------------------------------
+    String id, {
+    required String baseVersionId,
+    required List<String> ingredients,
+    required List<String> directions,
+    required String notes,
+    required List<String> tags,
+    List<String>? photoPaths,
+  }) async => Map<String, dynamic>.from(
+    await client.request(
+      'POST',
+      'dishes/$id/versions',
+      body: {
+        'base_version_id': baseVersionId,
+        'ingredients': ingredients,
+        'directions': directions,
+        'notes': notes,
+        'tags': tags,
+        'photo_paths': photoPaths ?? [],
+      },
+    ),
+  );
   Future<void> deleteVersion(String dishId, String versionId) async {
-    final dish = await supabase
-        .from('dishes')
-        .select('best_version')
-        .eq('id', dishId)
-        .single();
-
-    final currentBest = dish['best_version']?.toString();
-
-    if (currentBest == versionId) {
-      await supabase
-          .from('dishes')
-          .update({'best_version': null})
-          .eq('id', dishId);
-    }
-
-    await supabase
-        .from('dish_versions')
-        .delete()
-        .eq('id', versionId);
+    await client.request('DELETE', 'versions/$versionId');
   }
 
-  /// ------------------------------
-  /// Update best version
-  /// ------------------------------
   Future<void> updateBestVersion(String dishId, String versionId) async {
-    await supabase
-        .from('dishes')
-        .update({'best_version': versionId})
-        .eq('id', dishId);
+    await client.request(
+      'PATCH',
+      'dishes/$dishId/best',
+      body: {'version_id': versionId},
+    );
   }
 }

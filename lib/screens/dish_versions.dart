@@ -50,14 +50,15 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
         _currentStatus = dbStatus;
       }
 
-      final versions =
-      await widget.dishService.fetchDishVersions(widget.dish.id);
+      final versions = await widget.dishService.fetchDishVersions(
+        widget.dish.id,
+      );
       setState(() => _versions = versions);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load versions: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load versions: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -85,8 +86,10 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
                 title: const Text('Star this version (make best)'),
                 onTap: () async {
                   Navigator.pop(context);
-                  await widget.dishService
-                      .updateBestVersion(widget.dish.id, version.id);
+                  await widget.dishService.updateBestVersion(
+                    widget.dish.id,
+                    version.id,
+                  );
                   await _loadVersions();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -156,7 +159,10 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
               title: const Text('Delete this version'),
               onTap: () async {
                 Navigator.pop(context);
-                await widget.dishService.deleteVersion(widget.dish.id, version.id);
+                await widget.dishService.deleteVersion(
+                  widget.dish.id,
+                  version.id,
+                );
                 await _loadVersions();
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -185,6 +191,7 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
           return cs.primary; // in_testing
       }
     }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: Column(
@@ -192,27 +199,36 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
         children: [
           Text(
             "Dish Status",
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontFamily: kHeadingFont,fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontFamily: kHeadingFont,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 10),
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(
                 value: 'finalized',
-                label: Text('Finalized', style: TextStyle(fontFamily: kBodyFont)),
-                icon: Icon(Icons.check_circle)
+                label: Text(
+                  'Finalized',
+                  style: TextStyle(fontFamily: kBodyFont),
+                ),
+                icon: Icon(Icons.check_circle),
               ),
               ButtonSegment(
                 value: 'in_testing',
-                label: Text('In Testing', style: TextStyle(fontFamily: kBodyFont)),
+                label: Text(
+                  'In Testing',
+                  style: TextStyle(fontFamily: kBodyFont),
+                ),
                 icon: Icon(Icons.science),
               ),
               ButtonSegment(
                 value: 'abandoned',
-                label: Text('Abandoned', style: TextStyle(fontFamily: kBodyFont)),
+                label: Text(
+                  'Abandoned',
+                  style: TextStyle(fontFamily: kBodyFont),
+                ),
                 icon: Icon(Icons.cancel),
               ),
             ],
@@ -221,23 +237,19 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
               final newStatus = newSelection.first;
 
               // Optional confirmation for abandoning
-              if (newStatus == 'abandoned' &&
-                  _currentStatus != 'abandoned') {
+              if (newStatus == 'abandoned' && _currentStatus != 'abandoned') {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text("Mark as abandoned?"),
-                    content: const Text(
-                        "You can still change it later."),
+                    content: const Text("You can still change it later."),
                     actions: [
                       TextButton(
-                        onPressed: () =>
-                            Navigator.pop(ctx, false),
+                        onPressed: () => Navigator.pop(ctx, false),
                         child: const Text("Cancel"),
                       ),
                       ElevatedButton(
-                        onPressed: () =>
-                            Navigator.pop(ctx, true),
+                        onPressed: () => Navigator.pop(ctx, true),
                         child: const Text("Abandon"),
                       ),
                     ],
@@ -267,25 +279,20 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
               );
             },
             style: ButtonStyle(
-              backgroundColor:
-              WidgetStateProperty.resolveWith((states) {
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return statusColor(_currentStatus).withValues(alpha:0.15);
+                  return statusColor(_currentStatus).withValues(alpha: 0.15);
                 }
                 return Colors.grey.shade100;
               }),
-              foregroundColor:
-              WidgetStateProperty.resolveWith((states) {
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
                   return statusColor(_currentStatus);
                 }
                 return Colors.grey.shade700;
               }),
               side: WidgetStateProperty.all(
-                BorderSide(
-                  color: statusColor(_currentStatus),
-                  width: 1.2,
-                ),
+                BorderSide(color: statusColor(_currentStatus), width: 1.2),
               ),
             ),
           ),
@@ -294,17 +301,19 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.dish.name,
-          style: TextStyle(fontSize: 14),
-        ),
+        title: Text(widget.dish.name, style: TextStyle(fontSize: 14)),
         backgroundColor: cs.onSurface,
         actions: [
+          IconButton(
+            tooltip: 'Refresh versions',
+            onPressed: _isLoading ? null : _loadVersions,
+            icon: const Icon(Icons.refresh),
+          ),
           IconButton(
             tooltip: "View all notes",
             icon: const Icon(Icons.sticky_note_2),
@@ -325,64 +334,66 @@ class _DishVersionsScreenState extends State<DishVersionsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
-        children: [
-          _buildStatusToggle(),
-          const SizedBox(height: 6),
-          Expanded(
-            child: _versions.isEmpty
-                ? const Center(child: Text("No versions yet."))
-                : RefreshIndicator(
-              onRefresh: _loadVersions,
-              child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 12),
-                itemCount: _versions.length,
-                itemBuilder: (context, index) {
-                  final v = _versions[index];
-                  final isBest = v.id == _bestVersionId;
-                  final cs = Theme.of(context).colorScheme;
+              children: [
+                _buildStatusToggle(),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: _versions.isEmpty
+                      ? const Center(child: Text("No versions yet."))
+                      : RefreshIndicator(
+                          onRefresh: _loadVersions,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            itemCount: _versions.length,
+                            itemBuilder: (context, index) {
+                              final v = _versions[index];
+                              final isBest = v.id == _bestVersionId;
+                              final cs = Theme.of(context).colorScheme;
 
-                  return Card(
-                    color: isBest ? cs.secondary.withValues(alpha:0.2) : null,
-                    child: ListTile(
-                      title: Row(
-                        children: [
-                          Text(
-                            "Version ${v.versionNumber}",
-                            style: TextStyle(
-                              fontFamily: kHeadingFont,
-                              color: isBest
-                                  ? cs.onSurface
-                                  : cs.onSurface,
-                            ),
+                              return Card(
+                                color: isBest
+                                    ? cs.secondary.withValues(alpha: 0.2)
+                                    : null,
+                                child: ListTile(
+                                  title: Row(
+                                    children: [
+                                      Text(
+                                        "Version ${v.versionNumber}",
+                                        style: TextStyle(
+                                          fontFamily: kHeadingFont,
+                                          color: isBest
+                                              ? cs.onSurface
+                                              : cs.onSurface,
+                                        ),
+                                      ),
+                                      if (isBest) ...[
+                                        const SizedBox(width: 8),
+                                        const Icon(
+                                          Icons.star,
+                                          color: Colors.orange,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Date: ${v.createdAt.toIso8601String().split('T').first}",
+                                        style: TextStyle(fontFamily: kBodyFont),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () => _onVersionTap(v),
+                                ),
+                              );
+                            },
                           ),
-                          if (isBest) ...[
-                            const SizedBox(width: 8),
-                            const Icon(Icons.star,
-                                color: Colors.orange),
-                          ]
-                        ],
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Date: ${v.createdAt.toIso8601String().split('T').first}",
-                            style: TextStyle(
-                              fontFamily: kBodyFont
-                            )
-                          ),
-                        ],
-                      ),
-                      onTap: () => _onVersionTap(v),
-                    ),
-                  );
-                },
-              ),
+                        ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

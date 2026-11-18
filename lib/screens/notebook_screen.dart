@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../auth.dart';
 import '../models/note.dart';
 import '../services/note_service.dart';
 import 'note_editor_screen.dart';
@@ -12,7 +12,7 @@ class NotebookScreen extends StatefulWidget {
 }
 
 class _NotebookScreenState extends State<NotebookScreen> {
-  final NoteService _noteService = NoteService(Supabase.instance.client);
+  final NoteService _noteService = NoteService(backend);
   List<Note> _notes = [];
   bool _isLoading = true;
 
@@ -27,7 +27,9 @@ class _NotebookScreenState extends State<NotebookScreen> {
     _loadNotes();
     _searchController.addListener(() {
       if (mounted) {
-        setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
+        setState(
+          () => _searchQuery = _searchController.text.trim().toLowerCase(),
+        );
       }
     });
   }
@@ -45,9 +47,9 @@ class _NotebookScreenState extends State<NotebookScreen> {
       setState(() => _notes = notes);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error loading notes: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error loading notes: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -66,14 +68,18 @@ class _NotebookScreenState extends State<NotebookScreen> {
       list = list.where((n) {
         final titleMatch = n.title.toLowerCase().contains(_searchQuery);
         final contentMatch = n.content.toLowerCase().contains(_searchQuery);
-        final tagMatch = n.tags.any((t) => t.toLowerCase().contains(_searchQuery));
+        final tagMatch = n.tags.any(
+          (t) => t.toLowerCase().contains(_searchQuery),
+        );
         return titleMatch || contentMatch || tagMatch;
       }).toList();
     }
 
     // 3. Sorting
     if (_sortByAlpha) {
-      list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      list.sort(
+        (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+      );
     } else {
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
@@ -139,7 +145,9 @@ class _NotebookScreenState extends State<NotebookScreen> {
               MenuItemButton(
                 onPressed: () => setState(() => _sortByAlpha = !_sortByAlpha),
                 leadingIcon: Icon(
-                  _sortByAlpha ? Icons.check_box : Icons.check_box_outline_blank,
+                  _sortByAlpha
+                      ? Icons.check_box
+                      : Icons.check_box_outline_blank,
                   size: 20,
                   color: cs.primary,
                 ),
@@ -153,7 +161,9 @@ class _NotebookScreenState extends State<NotebookScreen> {
                 )
               else ...[
                 MenuItemButton(
-                  onPressed: _selectedTag == null ? null : () => setState(() => _selectedTag = null),
+                  onPressed: _selectedTag == null
+                      ? null
+                      : () => setState(() => _selectedTag = null),
                   child: Text(
                     "Clear Tag Filter",
                     style: TextStyle(
@@ -186,9 +196,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
 
     return Scaffold(
       backgroundColor: cs.onTertiaryFixedVariant,
-      appBar: AppBar(
-        title: const Text("Notebook"),
-      ),
+      appBar: AppBar(title: const Text("Notebook")),
       body: Column(
         children: [
           _buildSearchBar(cs),
@@ -196,97 +204,106 @@ class _NotebookScreenState extends State<NotebookScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : notes.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchQuery.isEmpty && _selectedTag == null
-                              ? "No notes yet. Tap + to create one."
-                              : "No matching notes found.",
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: notes.length,
-                        itemBuilder: (context, index) {
-                          final note = notes[index];
-                          return Card(
-                            child: ListTile(
-                              title: Text(
-                                note.title,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                ? Center(
+                    child: Text(
+                      _searchQuery.isEmpty && _selectedTag == null
+                          ? "No notes yet. Tap + to create one."
+                          : "No matching notes found.",
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: notes.length,
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
+                      return Card(
+                        child: ListTile(
+                          title: Text(
+                            note.title,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                note.content,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    note.content,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                              if (note.tags.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Wrap(
+                                    spacing: 4,
+                                    children: note.tags
+                                        .map(
+                                          (t) => Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: cs.primaryContainer,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              t,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: cs.onPrimaryContainer,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
                                   ),
-                                  if (note.tags.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Wrap(
-                                        spacing: 4,
-                                        children: note.tags
-                                            .map((t) => Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                      horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: cs.primaryContainer,
-                                                    borderRadius:
-                                                        BorderRadius.circular(4),
-                                                  ),
-                                                  child: Text(
-                                                    t,
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: cs.onPrimaryContainer,
-                                                    ),
-                                                  ),
-                                                ))
-                                            .toList(),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text("Delete note?"),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, false),
-                                    child: const Text("Cancel"),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, true),
-                                    child: const Text("Delete"),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
-                              await _noteService.deleteNote(note.id);
-                                  _loadNotes();
-                                }
-                              },
+                                ),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
                             ),
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => NoteEditorScreen(note: note),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Delete note?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text("Delete"),
+                                    ),
+                                  ],
                                 ),
                               );
-                              _loadNotes();
+                              if (confirm == true) {
+                                await _noteService.deleteNote(note.id);
+                                _loadNotes();
+                              }
                             },
                           ),
-                        );
-                      },
-                    ),
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => NoteEditorScreen(note: note),
+                              ),
+                            );
+                            _loadNotes();
+                          },
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

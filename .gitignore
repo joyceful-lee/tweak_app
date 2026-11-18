@@ -46,3 +46,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Vercel local project linkage and credentials
+.vercel/
+.env
+.env.*
+!.env.example
+!.env.migration.example
+node_modules/
+
+# Local signing material
+*.jks
+*.keystore
+android/key.properties

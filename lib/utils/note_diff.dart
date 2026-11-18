@@ -43,7 +43,8 @@ List<DiffChunk> diffText(String oldText, String newText) {
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && a[i - 1] == b[j - 1]) {
       push(DiffOp.equal, a[i - 1]);
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j])) {
       push(DiffOp.insert, b[j - 1]);
       j--;
@@ -78,7 +79,7 @@ TextSpan buildDiffSpan({
           return TextSpan(
             text: c.text,
             style: baseStyle.copyWith(
-              backgroundColor: cs.primary.withValues(alpha:0.20),
+              backgroundColor: cs.primary.withValues(alpha: 0.20),
               fontWeight: FontWeight.w600,
             ),
           );
@@ -88,7 +89,7 @@ TextSpan buildDiffSpan({
           return TextSpan(
             text: c.text,
             style: baseStyle.copyWith(
-              color: cs.error.withValues(alpha:0.85),
+              color: cs.error.withValues(alpha: 0.85),
               decoration: TextDecoration.lineThrough,
               decorationThickness: 2,
             ),

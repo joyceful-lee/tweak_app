@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -69,8 +68,9 @@ class ExportService {
       
       NOTES
       ${notes.isEmpty ? "(none)" : notes}
-      '''.trim();
-    }
+      '''
+        .trim();
+  }
 
   /// ------------------------------
   /// Share TXT
@@ -81,16 +81,18 @@ class ExportService {
     required bool isBest,
   }) async {
     final txt = buildRecipeTxt(dish: dish, version: version, isBest: isBest);
-    final dir = await getTemporaryDirectory();
 
-    final fileName = _safeFilename('${dish.name}_v${version.versionNumber}.txt');
-    final file = File('${dir.path}/$fileName');
-    await file.writeAsString(txt);
-
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: '${dish.name} • v${version.versionNumber}',
+    final fileName = _safeFilename(
+      '${dish.name}_v${version.versionNumber}.txt',
     );
+
+    await Share.shareXFiles([
+      XFile.fromData(
+        Uint8List.fromList(utf8.encode(txt)),
+        mimeType: 'text/plain',
+        name: fileName,
+      ),
+    ], text: '${dish.name} • v${version.versionNumber}');
   }
 
   /// ------------------------------
@@ -108,10 +110,7 @@ class ExportService {
       padding: const pw.EdgeInsets.only(top: 14, bottom: 6),
       child: pw.Text(
         t,
-        style: pw.TextStyle(
-          fontSize: 13,
-          fontWeight: pw.FontWeight.bold,
-        ),
+        style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
       ),
     );
 
@@ -137,8 +136,12 @@ class ExportService {
         pageFormat: PdfPageFormat.letter,
         margin: const pw.EdgeInsets.all(24),
         build: (context) {
-          final ingredients = version.ingredients.where((s) => s.trim().isNotEmpty).toList();
-          final directions = version.directions.where((s) => s.trim().isNotEmpty).toList();
+          final ingredients = version.ingredients
+              .where((s) => s.trim().isNotEmpty)
+              .toList();
+          final directions = version.directions
+              .where((s) => s.trim().isNotEmpty)
+              .toList();
           final tags = version.tags.where((t) => t.trim().isNotEmpty).toList();
           final notes = version.notes.trim();
 
@@ -169,10 +172,12 @@ class ExportService {
                 children: directions
                     .asMap()
                     .entries
-                    .map((e) => pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 4),
-                  child: pw.Text('${e.key + 1}. ${e.value}'),
-                ))
+                    .map(
+                      (e) => pw.Padding(
+                        padding: const pw.EdgeInsets.only(bottom: 4),
+                        child: pw.Text('${e.key + 1}. ${e.value}'),
+                      ),
+                    )
                     .toList(),
               ),
 
@@ -187,12 +192,11 @@ class ExportService {
     );
 
     final bytes = await doc.save();
-    final fileName = _safeFilename('${dish.name}_v${version.versionNumber}.pdf');
-
-    await Printing.sharePdf(
-      bytes: bytes,
-      filename: fileName,
+    final fileName = _safeFilename(
+      '${dish.name}_v${version.versionNumber}.pdf',
     );
+
+    await Printing.sharePdf(bytes: bytes, filename: fileName);
   }
 
   /// ------------------------------
@@ -212,15 +216,15 @@ class ExportService {
     };
 
     final jsonString = const JsonEncoder.withIndent('  ').convert(exportData);
-    final dir = await getTemporaryDirectory();
-    final fileName = 'tweak_export_${DateTime.now().millisecondsSinceEpoch}.json';
-    final file = File('${dir.path}/$fileName');
+    final fileName =
+        'tweak_export_${DateTime.now().millisecondsSinceEpoch}.json';
 
-    await file.writeAsString(jsonString);
-
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'My Tweak Data Export',
-    );
+    await Share.shareXFiles([
+      XFile.fromData(
+        Uint8List.fromList(utf8.encode(jsonString)),
+        mimeType: 'application/json',
+        name: fileName,
+      ),
+    ], text: 'My Tweak Data Export');
   }
 }

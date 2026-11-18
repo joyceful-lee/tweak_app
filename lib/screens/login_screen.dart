@@ -1,7 +1,8 @@
 import 'dart:ui'; // for ImageFilter.blur
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth.dart';
+import 'reset_password_screen.dart';
+import '../widgets/account_actions.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -46,14 +47,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Password reset email sent to $email")),
+        SnackBar(
+          content: Text("A password reset code was requested for $email"),
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ResetPasswordScreen(email: email)),
       );
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => error = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => error = 'Unable to send the reset email. Please try again.');
+      setState(
+        () => error = 'Unable to send the reset email. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -80,15 +89,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (isLogin) {
-        await signIn(
-          email,
-          password,
-        );
+        await signIn(email, password);
       } else {
-        await signUp(
-          email,
-          password,
-        );
+        await signUp(email, password);
 
         if (!mounted) return;
 
@@ -131,7 +134,10 @@ class _LoginScreenState extends State<LoginScreen> {
       await signInWithGoogle();
     } catch (_) {
       if (mounted) {
-        setState(() => error = 'Google sign-in could not be started. Please try again.');
+        setState(
+          () =>
+              error = 'Google sign-in could not be started. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => loading = false);
@@ -164,13 +170,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
 
                   Container(
+                    constraints: const BoxConstraints(maxWidth: 460),
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: cs.onPrimary.withValues(alpha:0.82),
+                      color: cs.onPrimary.withValues(alpha: 0.82),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha:0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         ),
@@ -179,6 +186,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Text('Returning after the update? Create a new login using your previous email, then restore your recipes in Settings.'),
+                        const SizedBox(height:16),
                         TextField(
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -213,7 +222,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: (loading || !isLogin) ? null : _forgotPassword,
+                            onPressed: (loading || !isLogin)
+                                ? null
+                                : _forgotPassword,
                             child: const Text("Forgot password?"),
                           ),
                         ),
@@ -237,20 +248,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           child: loading
                               ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : Text(isLogin ? "Login" : "Sign Up"),
                         ),
                         const SizedBox(height: 12),
 
                         ElevatedButton.icon(
                           onPressed: loading ? null : _continueWithGoogle,
-                          icon: Image.asset('assets/icons/google-icon.png', height: 20),
+                          icon: Image.asset(
+                            'assets/icons/google-icon.png',
+                            height: 20,
+                          ),
                           label: const Text("Continue with Google"),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
@@ -265,21 +279,34 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: loading
                               ? null
                               : () {
-                            if (!mounted) return;
-                            setState(() => isLogin = !isLogin);
-                          },
+                                  if (!mounted) return;
+                                  setState(() => isLogin = !isLogin);
+                                },
                           child: Text(
                             isLogin
                                 ? "Need an account? Sign up"
                                 : "Already have an account? Login",
                           ),
                         ),
+                        TextButton(
+                          onPressed: loading
+                              ? null
+                              : () {
+                                  final email = emailController.text.trim();
+                                  if (_isValidEmail(email)) {
+                                    verifyEmailDialog(context, email);
+                                  } else {
+                                    setState(
+                                      () => error =
+                                          'Enter a valid email address first.',
+                                    );
+                                  }
+                                },
+                          child: const Text('Verify email with a code'),
+                        ),
                         const SizedBox(height: 24),
 
-                        Image.asset(
-                          'assets/icons/tweak.png',
-                          height: 80,
-                        ),
+                        Image.asset('assets/icons/tweak.png', height: 80),
                         const SizedBox(height: 0),
                       ],
                     ),
